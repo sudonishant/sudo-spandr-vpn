@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SUDO SPANDR — Next-Gen Cyber Sentinel & Military VPN Command Center</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            cyber: {
+              black: '#04070c',
+              dark: '#080d15',
+              panel: '#0d1522',
+              cardHover: '#131e30',
+              border: 'rgba(0, 242, 254, 0.15)',
+              cyan: '#00f2fe',
+              neonBlue: '#4facfe',
+              emerald: '#10b981',
+              rose: '#f43f5e',
+              amber: '#f59e0b',
+              purple: '#a855f7'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['"Fira Code"', '"JetBrains Mono"', 'monospace']
+          },
+          animation: {
+            'glow-pulse': 'glowPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'radar-spin': 'radarSpin 5s linear infinite',
+            'scan-line': 'scanLine 3s linear infinite',
+          },
+          keyframes: {
+            glowPulse: {
+              '0%, 100%': { opacity: '0.9', filter: 'drop-shadow(0 0 20px rgba(0, 242, 254, 0.6))' },
+              '50%': { opacity: '0.4', filter: 'drop-shadow(0 0 5px rgba(0, 242, 254, 0.2))' }
+            },
+            radarSpin: {
+              '0%': { transform: 'rotate(0deg)' },
+              '100%': { transform: 'rotate(360deg)' }
+            },
+            scanLine: {
+              '0%': { transform: 'translateY(-100%)' },
+              '100%': { transform: 'translateY(1000%)' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome 6 Pro-style CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Google Fonts: Inter & Fira Code -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS & JS for Cyber Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    body {
+      background-color: #04070c;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08) 0%, transparent 50%),
+        linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+    }
+
+    .glass-box {
+      background: rgba(13, 21, 34, 0.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(56, 189, 248, 0.16);
+      box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.8);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .glass-box:hover {
+      border-color: rgba(0, 242, 254, 0.4);
+      box-shadow: 0 16px 50px -10px rgba(0, 242, 254, 0.2);
+    }
+
+    .neon-border-red {
+      box-shadow: 0 0 30px rgba(244, 63, 94, 0.35), inset 0 0 20px rgba(244, 63, 94, 0.12);
+      border-color: rgba(244, 63, 94, 0.6) !important;
+    }
+
+    .neon-border-green {
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.35), inset 0 0 20px rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.6) !important;
+    }
+
+    #map {
+      height: 320px;
+      border-radius: 1rem;
+      border: 1px solid rgba(0, 242, 254, 0.2);
+      z-index: 10;
+    }
+
+    /* Tab active styles */
+    .tab-btn.active {
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+      color: #04070c;
+      font-weight: 800;
+      box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
+    }
+
+    /* Modal dialog */
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #04070c;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #00f2fe;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-200 antialiased selection:bg-cyan-400 selection:text-slate-950 font-sans">
+
+  <!-- TOP MILITARY HUD / STATUS BAR -->
+  <header class="border-b border-cyan-500/20 bg-cyber-black/90 backdrop-blur-2xl sticky top-0 z-50 px-6 py-3.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand Logo & Cyber Badges -->
+      <div class="flex items-center space-x-3.5">
+        <div class="relative group cursor-pointer" onclick="manualRefresh()">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-purple-700 flex items-center justify-center shadow-xl shadow-cyan-500/30 group-hover:scale-105 transition-transform duration-300">
+            <i class="fa-solid fa-shield-halved text-2xl text-white"></i>
+          </div>
+          <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-cyan-400"></span>
+          </span>
+        </div>
+
+        <div>
+          <div class="flex items-center space-x-3">
+            <h1 class="text-2xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-teal-200 to-indigo-300 font-mono">
+              SUDO SPANDR
+            </h1>
+            <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-cyan-950/90 text-cyan-300 border border-cyan-500/50 font-mono font-bold tracking-widest uppercase shadow-sm">
+              MILITARY C4I SENTINEL
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-medium">Autonomous Tunnel Detection, Deep Security Audit & Cryptographic Advisor</p>
+        </div>
+      </div>
+
+      <!-- Live Stream Indicator & Quick Actions -->
+      <div class="flex items-center space-x-3">
+        <!-- Live WebSocket Heartbeat -->
+        <div class="flex items-center space-x-2.5 px-3 py-1.5 rounded-xl bg-cyber-panel border border-cyan-500/20 text-xs font-mono">
+          <span id="ws-indicator-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-slate-400 text-[11px]">LIVE SYNC: <span id="ws-status" class="text-emerald-400 font-semibold">2s Ticks</span></span>
+        </div>
+
+        <!-- Emergency Flush DNS -->
+        <button onclick="flushDNS()" title="Flush DNS Cache" class="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition flex items-center gap-1.5 active:scale-95">
+          <i class="fa-solid fa-broom text-amber-400"></i> Flush DNS
+        </button>
+
+        <!-- Quick Re-Scan -->
+        <button onclick="manualRefresh()" id="refresh-btn" class="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 transition-all flex items-center gap-2 active:scale-95 shadow-md">
+          <i class="fa-solid fa-arrows-rotate text-xs" id="refresh-icon"></i>
+          <span>Re-scan</span>
+        </button>
+
+        <!-- Link to IPsec X-Ray Protocol Deep Inspector -->
+        <a href="http://localhost:8000" target="_blank" class="px-4 py-1.5 text-xs font-black rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 hover:from-cyan-300 hover:to-blue-400 text-slate-950 hover:text-white transition shadow-lg shadow-cyan-500/25 flex items-center gap-2">
+          <i class="fa-solid fa-radar text-xs"></i>
+          <span>IPsec X-Ray (:8000)</span>
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- NAVIGATION TABS -->
+  <div class="border-b border-slate-800/80 bg-cyber-dark/60 backdrop-blur px-6 py-2.5">
+    <div class="max-w-7xl mx-auto flex items-center space-x-2 overflow-x-auto text-xs font-mono">
+      <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn active px-4 py-2 rounded-xl transition flex items-center gap-2">
+        <i class="fa-solid fa-gauge-high"></i> Executive Dashboard
+      </button>
+      <button onclick="switchTab('audit')" id="tab-audit" class="tab-btn px-4 py-2 rounded-xl text-slate-400 hover:text-slate-200 transition flex items-center gap-2">
+        <i class="fa-solid fa-shield-virus"></i> Deep Security Audit (5-Factor)
+      </button>
+      <button onclick="switchTab('advisor')" id="tab-advisor" class="tab-btn px-4 py-2 rounded-xl text-slate-400 hover:text-slate-200 transition flex items-center gap-2">
+        <i class="fa-solid fa-brain"></i> "Kaun Sa Accha Rahega" Advisor
+      </button>
+      <button onclick="switchTab('routes')" id="tab-routes" class="tab-btn px-4 py-2 rounded-xl text-slate-400 hover:text-slate-200 transition flex items-center gap-2">
+        <i class="fa-solid fa-network-wired"></i> Routing & Interfaces Table
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 flex-1 space-y-8">
+
+    <!-- ========================================== -->
+    <!-- TAB 1: EXECUTIVE DASHBOARD                 -->
+    <!-- ========================================== -->
+    <div id="view-dashboard" class="space-y-8">
+
+      <!-- HERO STATUS SHIELD BANNER -->
+      <div id="status-hero" class="p-7 rounded-3xl border transition-all duration-700 flex flex-col lg:flex-row items-center justify-between gap-6 relative overflow-hidden glass-box">
+        
+        <!-- Ambient Radial Glow -->
+        <div id="hero-ambient" class="absolute -right-20 -top-20 w-96 h-96 rounded-full blur-3xl opacity-20 pointer-events-none transition-all duration-700 bg-red-500"></div>
+
+        <!-- Left Column: Shield Icon & Status Verdict -->
+        <div class="flex items-center space-x-6 z-10">
+          <div id="shield-icon-container" class="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex items-center justify-center text-4xl sm:text-5xl shadow-2xl transition-all duration-500 border">
+            <i id="shield-icon" class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-3">
+              <h2 id="hero-title" class="text-2xl sm:text-3xl font-black text-white tracking-tight">Scanning Tunnel Architecture...</h2>
+              <span id="hero-badge" class="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider font-mono">SCANNING</span>
+            </div>
+            <p id="hero-desc" class="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">Analyzing kernel network interfaces, routing tables, and cryptographic listeners.</p>
+          </div>
+        </div>
+
+        <!-- Right Column: Scores & Anycast Latency -->
+        <div class="flex items-center gap-6 sm:gap-10 divide-x divide-slate-800 text-center z-10 w-full lg:w-auto justify-around lg:justify-end border-t lg:border-t-0 pt-4 lg:pt-0 border-slate-800">
+          <div class="space-y-0.5">
+            <p class="text-[10px] uppercase tracking-widest text-slate-400 font-mono font-bold">Privacy Grade</p>
+            <div id="grade-display" class="text-3xl sm:text-4xl font-black transition-colors duration-500 font-mono">--</div>
+            <span id="grade-sub" class="text-[10px] text-slate-400 block font-medium">Anonymity Tier</span>
+          </div>
+          
+          <div class="pl-6 sm:pl-10 space-y-0.5">
+            <p class="text-[10px] uppercase tracking-widest text-slate-400 font-mono font-bold">Tunnel Latency</p>
+            <div id="ping-display" class="text-3xl sm:text-4xl font-black text-cyan-400 font-mono transition-colors duration-500">-- ms</div>
+            <span class="text-[10px] text-slate-400 block font-medium">Anycast Handshake</span>
+          </div>
+
+          <div class="pl-6 sm:pl-10 space-y-0.5">
+            <p class="text-[10px] uppercase tracking-widest text-slate-400 font-mono font-bold">Security Score</p>
+            <div id="score-display" class="text-3xl sm:text-4xl font-black text-white font-mono">--/100</div>
+            <span id="score-sub" class="text-[10px] text-rose-400 font-semibold block">Vulnerable</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4-COLUMN METRICS GRID -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <!-- CARD 1: ACTIVE VPN STATUS -->
+        <div class="glass-box p-6 rounded-2xl flex flex-col justify-between relative group">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                <i class="fa-solid fa-ethernet"></i> VPN Tunnel
+              </span>
+              <span id="vpn-active-pill" class="text-[10px] px-2.5 py-0.5 rounded-full font-mono font-semibold">Scanning</span>
+            </div>
+            <h3 id="active-vpn-name" class="text-xl font-bold text-white mb-1">Direct Connection</h3>
+            <p id="vpn-detail-desc" class="text-xs text-slate-400 mb-5 leading-relaxed">No encapsulated tunnel (WireGuard, OpenVPN, IPsec) currently routing payload egress.</p>
+          </div>
+          <div class="border-t border-slate-800/80 pt-4 space-y-2 text-xs font-mono">
+            <div class="flex justify-between items-center text-slate-400">
+              <span class="font-sans text-slate-400">Interface:</span>
+              <span id="vpn-interface" class="font-semibold text-slate-200 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">None</span>
+            </div>
+            <div class="flex justify-between items-center text-slate-400">
+              <span class="font-sans text-slate-400">MTU Size:</span>
+              <span id="vpn-mtu" class="text-cyan-300">1500 (Standard)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 2: PUBLIC IDENTITY & LEAK -->
+        <div class="glass-box p-6 rounded-2xl flex flex-col justify-between relative group">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                <i class="fa-solid fa-fingerprint"></i> Public Identity
+              </span>
+              <span id="leak-alert-pill" class="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase font-mono">ISP Exposed</span>
+            </div>
+            <div class="font-mono text-xl font-black text-slate-100 tracking-tight mb-1 flex items-center gap-2" id="public-ip">
+              <span>Loading IP...</span>
+            </div>
+            <p id="public-isp" class="text-xs text-amber-300/90 font-medium truncate mb-5">Resolving ASN...</p>
+          </div>
+          <div class="border-t border-slate-800/80 pt-4 space-y-2 text-xs">
+            <div class="flex justify-between items-center text-slate-400">
+              <span>Location:</span>
+              <span id="geo-location" class="text-slate-200 font-semibold truncate max-w-[140px]">--</span>
+            </div>
+            <div class="flex justify-between items-center text-slate-400">
+              <span>ASN Tag:</span>
+              <span id="geo-asn" class="text-slate-300 font-mono font-bold">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 3: DNS LEAK INSPECTION -->
+        <div class="glass-box p-6 rounded-2xl flex flex-col justify-between relative group">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-2">
+                <i class="fa-solid fa-server"></i> DNS Resolver
+              </span>
+              <span id="dns-status-pill" class="text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold bg-amber-950 text-amber-300 border border-amber-800">Recursive ISP</span>
+            </div>
+            <h3 id="dns-server-display" class="text-xl font-bold font-mono text-white mb-1">127.0.0.53</h3>
+            <p class="text-xs text-slate-400 mb-5 leading-relaxed">System DNS calls route through local systemd-resolved stack.</p>
+          </div>
+          <div class="border-t border-slate-800/80 pt-4 space-y-2 text-xs font-mono">
+            <div class="flex justify-between items-center text-slate-400">
+              <span class="font-sans text-slate-400">Leak Risk:</span>
+              <span id="dns-leak-text" class="text-rose-400 font-semibold">High (Plain Port 53)</span>
+            </div>
+            <div class="flex justify-between items-center text-slate-400">
+              <span class="font-sans text-slate-400">DoH/DoT:</span>
+              <span class="text-slate-400">Unverified</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 4: KILL-SWITCH INTEGRITY -->
+        <div class="glass-box p-6 rounded-2xl flex flex-col justify-between relative group">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-2">
+                <i class="fa-solid fa-skull-crossbones"></i> Kill-Switch
+              </span>
+              <span class="text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold bg-rose-950 text-rose-300 border border-rose-800">DISABLED</span>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-1">Firewall Egress Open</h3>
+            <p class="text-xs text-slate-400 mb-5 leading-relaxed">If VPN drops, unencrypted packets immediately bleed to public gateway.</p>
+          </div>
+          <div class="border-t border-slate-800/80 pt-4 space-y-2 text-xs">
+            <div class="flex justify-between items-center text-slate-400">
+              <span>IPTables Clamp:</span>
+              <span class="font-mono text-rose-400 font-semibold">No Rule</span>
+            </div>
+            <div class="flex justify-between items-center text-slate-400">
+              <span>Traffic Leak:</span>
+              <span class="font-mono text-rose-400">Unrestricted</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- GEOLOCATION RADAR MAP & LIVE LATENCY BENCHMARK -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- LEAFLET MAP VISUALIZER -->
+        <div class="lg:col-span-2 glass-box p-6 rounded-3xl space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></div>
+              <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-satellite-dish text-cyan-400"></i> Geospatial Triangulation & ISP Node
+              </h3>
+            </div>
+            <span class="text-[11px] font-mono text-cyan-300 bg-cyan-950/70 px-3 py-1 rounded-lg border border-cyan-800">
+              Ground Truth Node: <span id="map-node-label" class="font-bold">Dhanbad, IN</span>
+            </span>
+          </div>
+
+          <div id="map" class="shadow-inner"></div>
+
+          <div class="flex flex-wrap items-center justify-between text-xs text-slate-400 pt-1">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+              <span>Coordinates: <b id="map-coords" class="text-slate-200 font-mono">23.7976° N, 86.4299° E</b></span>
+            </div>
+            <div class="font-mono text-[11px] text-slate-400">
+              Physical Country: <span class="text-cyan-300 font-semibold">India (IN)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- MULTI-TARGET LATENCY BENCHMARK BARS -->
+        <div class="glass-box p-6 rounded-3xl flex flex-col justify-between space-y-4">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-gauge-high text-emerald-400"></i> Multi-Node Probes
+              </h3>
+              <button onclick="runPingTest()" class="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 font-semibold transition active:scale-95 flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-bolt text-[10px]"></i> Probe
+              </button>
+            </div>
+
+            <!-- Ping Probe List with Live Latency Bars -->
+            <div id="ping-bars-container" class="space-y-3.5 text-xs">
+              <div>
+                <div class="flex justify-between items-center text-slate-300 mb-1">
+                  <span class="font-medium flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Cloudflare Anycast (1.1.1.1)
+                  </span>
+                  <span id="ping-cf" class="font-mono text-emerald-400 font-bold">-- ms</span>
+                </div>
+                <div class="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                  <div id="bar-cf" class="bg-gradient-to-r from-emerald-500 to-cyan-400 h-1.5 rounded-full transition-all duration-500" style="width: 25%"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between items-center text-slate-300 mb-1">
+                  <span class="font-medium flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> Google Global DNS (8.8.8.8)
+                  </span>
+                  <span id="ping-google" class="font-mono text-cyan-400 font-bold">-- ms</span>
+                </div>
+                <div class="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                  <div id="bar-google" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-1.5 rounded-full transition-all duration-500" style="width: 35%"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between items-center text-slate-300 mb-1">
+                  <span class="font-medium flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Quad9 Swiss Enclave (9.9.9.9)
+                  </span>
+                  <span id="ping-quad9" class="font-mono text-indigo-400 font-bold">-- ms</span>
+                </div>
+                <div class="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                  <div id="bar-quad9" class="bg-gradient-to-r from-indigo-500 to-purple-500 h-1.5 rounded-full transition-all duration-500" style="width: 40%"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between items-center text-slate-300 mb-1">
+                  <span class="font-medium flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span> Mullvad Security (Sweden)
+                  </span>
+                  <span id="ping-mullvad" class="font-mono text-purple-400 font-bold">-- ms</span>
+                </div>
+                <div class="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                  <div id="bar-mullvad" class="bg-gradient-to-r from-purple-500 to-rose-500 h-1.5 rounded-full transition-all duration-500" style="width: 50%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-slate-800/80">
+            <span class="text-[10px] text-slate-400 uppercase font-mono block mb-1">Quick Action:</span>
+            <button onclick="switchTab('advisor')" class="w-full py-2.5 px-3 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-lightbulb"></i> View Protocol Recommendations
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: DEEP SECURITY AUDIT                 -->
+    <!-- ========================================== -->
+    <div id="view-audit" class="hidden space-y-6">
+      
+      <div class="glass-box p-7 rounded-3xl space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+          <div>
+            <h2 class="text-2xl font-black text-white tracking-tight flex items-center gap-3">
+              <i class="fa-solid fa-shield-virus text-cyan-400"></i>
+              Military 5-Factor Security Audit Engine
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+              Evaluates passive side-channels, metadata leakage, ISP data profiling, and dual-stack exposure.
+            </p>
+          </div>
+          <button onclick="runAudit()" class="px-4 py-2 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/20 flex items-center gap-2 self-start">
+            <i class="fa-solid fa-rotate"></i> Run Full Audit
+          </button>
+        </div>
+
+        <!-- Audit Score Overview Banner -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 text-center">
+            <p class="text-xs font-mono text-slate-400 uppercase">Composite Security Score</p>
+            <div id="audit-score-num" class="text-5xl font-black font-mono text-white mt-2">--/100</div>
+            <p id="audit-verdict" class="text-xs font-bold text-rose-400 mt-2 uppercase tracking-wider">Scanning...</p>
+          </div>
+
+          <div class="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 text-center">
+            <p class="text-xs font-mono text-slate-400 uppercase">Cryptographic Anonymity Tier</p>
+            <div id="audit-grade-char" class="text-5xl font-black font-mono text-rose-500 mt-2">--</div>
+            <p class="text-xs text-slate-400 mt-2">NIST SP 800-77 & RFC 8221 Alignment</p>
+          </div>
+
+          <div class="p-6 rounded-2xl bg-slate-950/80 border border-slate-800 text-center">
+            <p class="text-xs font-mono text-slate-400 uppercase">Penalties Incurred</p>
+            <div id="audit-penalties" class="text-5xl font-black font-mono text-amber-400 mt-2">--</div>
+            <p class="text-xs text-slate-400 mt-2">Points deducted for unencrypted headers</p>
+          </div>
+        </div>
+
+        <!-- Checklist of 5 Deep Factors -->
+        <div class="space-y-3 pt-2" id="audit-checks-list">
+          <div class="p-6 text-center text-slate-500 font-mono">Loading audit parameters...</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: "KAUN SA ACCHA RAHEGA" ADVISOR       -->
+    <!-- ========================================== -->
+    <div id="view-advisor" class="hidden space-y-6">
+      
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <span class="w-3 h-3 rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/50"></span>
+            <h2 class="text-2xl font-black text-white tracking-tight">Kaun Sa VPN Accha Rahega?</h2>
+            <span class="text-xs px-2.5 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 font-mono font-bold">SMART PROTOCOL ADVISOR</span>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-400 mt-1">
+            Current network condition aur use-case ke hisaab se best VPN protocols ka complete breakdown, architecture comparison aur one-click commands.
+          </p>
+        </div>
+
+        <!-- Category Filter Buttons -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1">
+          <button onclick="filterRecs('all')" class="rec-filter active px-3.5 py-1.5 text-xs rounded-xl bg-cyan-500 text-slate-950 font-bold transition shadow-md shadow-cyan-500/20" data-filter="all">All Protocols</button>
+          <button onclick="filterRecs('speed')" class="rec-filter px-3.5 py-1.5 text-xs rounded-xl bg-slate-800/80 text-slate-300 hover:bg-slate-700 font-semibold transition" data-filter="speed">Gaming & Speed</button>
+          <button onclick="filterRecs('security')" class="rec-filter px-3.5 py-1.5 text-xs rounded-xl bg-slate-800/80 text-slate-300 hover:bg-slate-700 font-semibold transition" data-filter="security">Enterprise & Gov</button>
+          <button onclick="filterRecs('firewall')" class="rec-filter px-3.5 py-1.5 text-xs rounded-xl bg-slate-800/80 text-slate-300 hover:bg-slate-700 font-semibold transition" data-filter="firewall">Bypass Firewalls</button>
+        </div>
+      </div>
+
+      <!-- Recommendation Cards Container -->
+      <div id="recommendation-cards" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="col-span-2 p-12 text-center text-slate-500 font-mono">
+          <i class="fa-solid fa-spinner fa-spin text-2xl text-cyan-400 mb-2"></i>
+          <p>Compiling protocol intelligence matrix...</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 4: ROUTING & INTERFACES TABLE          -->
+    <!-- ========================================== -->
+    <div id="view-routes" class="hidden space-y-6">
+      
+      <div class="glass-box p-7 rounded-3xl space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-4">
+          <div>
+            <h2 class="text-xl font-black text-white tracking-tight flex items-center gap-2.5">
+              <i class="fa-solid fa-network-wired text-cyan-400"></i>
+              System Interfaces & Egress Routing Tables
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Live kernel socket adapters and IP routing rules.</p>
+          </div>
+          <button onclick="loadInterfacesAndRoutes()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+            <i class="fa-solid fa-arrows-rotate mr-1"></i> Refresh
+          </button>
+        </div>
+
+        <!-- Interfaces Sub-section -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">Kernel Network Adapters</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs font-mono">
+              <thead class="bg-slate-950/80 text-slate-400 border-b border-slate-800 uppercase text-[10px]">
+                <tr>
+                  <th class="p-3">Interface Name</th>
+                  <th class="p-3">State</th>
+                  <th class="p-3">Type</th>
+                  <th class="p-3">MTU</th>
+                  <th class="p-3">MAC Hardware Address</th>
+                </tr>
+              </thead>
+              <tbody id="interfaces-tbody" class="divide-y divide-slate-800/60 text-slate-300">
+                <tr><td colspan="5" class="p-4 text-center text-slate-500">Loading interfaces...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Routes Sub-section -->
+        <div class="pt-4 border-t border-slate-800/80">
+          <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">Kernel Routing Table</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs font-mono">
+              <thead class="bg-slate-950/80 text-slate-400 border-b border-slate-800 uppercase text-[10px]">
+                <tr>
+                  <th class="p-3">Destination Subnet</th>
+                  <th class="p-3">Gateway IP</th>
+                  <th class="p-3">Device Interface</th>
+                  <th class="p-3">Metric</th>
+                </tr>
+              </thead>
+              <tbody id="routes-tbody" class="divide-y divide-slate-800/60 text-slate-300">
+                <tr><td colspan="4" class="p-4 text-center text-slate-500">Loading routes...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- CYBER FOOTER -->
+  <footer class="border-t border-cyan-500/10 bg-cyber-black/95 py-6 text-xs text-slate-500 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <span class="font-extrabold text-slate-300 tracking-wider font-mono">SUDO SPANDR</span>
+        <span class="text-slate-600">|</span>
+        <span>SIH 2026 · Problem Statement SIH26160</span>
+      </div>
+      <div class="flex items-center space-x-4 font-mono text-[11px] text-slate-400">
+        <span>FastAPI Sentinel</span>
+        <span>•</span>
+        <span>5-Factor Security Audit</span>
+        <span>•</span>
+        <span>Zero-Decryption Analysis</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 px-4 py-3 rounded-2xl bg-slate-900 border border-cyan-500/50 text-slate-100 text-xs font-semibold shadow-2xl flex items-center gap-3">
+    <i class="fa-solid fa-circle-check text-cyan-400 text-base"></i>
+    <span id="toast-msg">Action completed!</span>
+  </div>
+
+  <!-- CONFIG MODAL FOR TEMPLATES -->
+  <dialog id="config-modal" class="rounded-2xl bg-cyber-panel text-slate-200 border border-cyan-500/30 p-6 max-w-xl w-full shadow-2xl">
+    <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+      <h3 id="modal-title" class="text-lg font-bold text-white font-mono flex items-center gap-2">
+        <i class="fa-solid fa-file-code text-cyan-400"></i> Configuration Template
+      </h3>
+      <button onclick="document.getElementById('config-modal').close()" class="text-slate-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+    <div class="py-4">
+      <pre id="modal-code" class="bg-black/80 p-4 rounded-xl text-xs font-mono text-cyan-300 overflow-x-auto border border-slate-800 select-all"></pre>
+    </div>
+    <div class="flex justify-end gap-3 pt-2">
+      <button onclick="navigator.clipboard.writeText(document.getElementById('modal-code').innerText); showToast('Template copied!');" class="px-4 py-2 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs hover:bg-cyan-400 transition">
+        <i class="fa-regular fa-copy mr-1"></i> Copy Template
+      </button>
+      <button onclick="document.getElementById('config-modal').close()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">
+        Close
+      </button>
+    </div>
+  </dialog>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    let map = null;
+    let mapMarker = null;
+    let allRecommendations = [];
+
+    // Toast helper
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      if (toast && toastMsg) {
+        toastMsg.innerText = msg;
+        toast.classList.remove('translate-y-20', 'opacity-0');
+        setTimeout(() => {
+          toast.classList.add('translate-y-20', 'opacity-0');
+        }, 2500);
+      }
+    }
+
+    // Switch Tab Engine
+    function switchTab(tabId) {
+      const tabs = ['dashboard', 'audit', 'advisor', 'routes'];
+      tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tabId) {
+          if (view) view.classList.remove('hidden');
+          if (btn) btn.className = "tab-btn active px-4 py-2 rounded-xl transition flex items-center gap-2";
+        } else {
+          if (view) view.classList.add('hidden');
+          if (btn) btn.className = "tab-btn px-4 py-2 rounded-xl text-slate-400 hover:text-slate-200 transition flex items-center gap-2";
+        }
+      });
+
+      if (tabId === 'routes') loadInterfacesAndRoutes();
+      if (tabId === 'audit') runAudit();
+      if (tabId === 'dashboard' && map) setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    // Leaflet Cyber Map Initialization
+    function initMap(lat = 23.7976, lng = 86.4299, city = "Location") {
+      if (!map) {
+        map = L.map('map', { zoomControl: false }).setView([lat, lng], 11);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; OpenStreetMap & CartoDB',
+          maxZoom: 18
+        }).addTo(map);
+
+        const customIcon = L.divIcon({
+          className: 'custom-map-pin',
+          html: `<div class="w-6 h-6 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-lg shadow-cyan-400/80 animate-pulse flex items-center justify-center text-[10px] text-black font-black">●</div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+
+        mapMarker = L.marker([lat, lng], { icon: customIcon }).addTo(map)
+          .bindPopup(`<div class="font-sans text-xs"><b>${city}</b><br><span class="text-slate-500">Public IP Triangulation</span></div>`);
+      } else {
+        map.setView([lat, lng], 11);
+        if (mapMarker) {
+          mapMarker.setLatLng([lat, lng]).setPopupContent(`<div class="font-sans text-xs"><b>${city}</b><br><span class="text-slate-500">Public IP Triangulation</span></div>`);
+        }
+      }
+    }
+
+    // Manual Refresh
+    async function manualRefresh() {
+      const icon = document.getElementById('refresh-icon');
+      if (icon) icon.classList.add('fa-spin');
+      await fetchStatus();
+      await runPingTest();
+      setTimeout(() => {
+        if (icon) icon.classList.remove('fa-spin');
+        showToast("System re-scanned and synchronized!");
+      }, 500);
+    }
+
+    // Flush DNS Cache
+    async function flushDNS() {
+      try {
+        const res = await fetch('/api/tools/flush-dns', { method: 'POST' });
+        const data = await res.json();
+        showToast(data.message || "DNS Cache Flushed!");
+      } catch (e) {
+        showToast("DNS Cache Flush triggered.");
+      }
+    }
+
+    // Fetch initial status via REST
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        updateUI(data);
+      } catch (err) {
+        console.error("Status fetch error:", err);
+      }
+    }
+
+    // Update UI elements
+    function updateUI(data) {
+      if (!data) return;
+
+      const vpn = data.vpn || {};
+      const id = data.identity || {};
+      const sec = data.security || {};
+      const bench = data.benchmarks || {};
+      const audit = data.audit || {};
+
+      // 1. Hero Banner
+      const hero = document.getElementById('status-hero');
+      const ambient = document.getElementById('hero-ambient');
+      const shieldContainer = document.getElementById('shield-icon-container');
+      const shieldIcon = document.getElementById('shield-icon');
+      const heroTitle = document.getElementById('hero-title');
+      const heroBadge = document.getElementById('hero-badge');
+      const heroDesc = document.getElementById('hero-desc');
+      const gradeDisplay = document.getElementById('grade-display');
+      const pingDisplay = document.getElementById('ping-display');
+      const scoreDisplay = document.getElementById('score-display');
+      const scoreSub = document.getElementById('score-sub');
+
+      if (vpn.is_connected) {
+        hero.className = "p-7 rounded-3xl border transition-all duration-700 flex flex-col lg:flex-row items-center justify-between gap-6 relative overflow-hidden glass-box neon-border-green";
+        ambient.className = "absolute -right-20 -top-20 w-96 h-96 rounded-full blur-3xl opacity-20 pointer-events-none transition-all duration-700 bg-emerald-500";
+        shieldContainer.className = "w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex items-center justify-center text-4xl sm:text-5xl shadow-2xl transition-all duration-500 border bg-emerald-950/80 text-emerald-400 border-emerald-600/80 shadow-emerald-500/25";
+        shieldIcon.className = "fa-solid fa-shield-check";
+        heroTitle.innerText = "Tunnel Active & Encrypted";
+        heroBadge.className = "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider font-mono bg-emerald-950 text-emerald-300 border border-emerald-700";
+        heroBadge.innerText = "SECURE";
+        heroDesc.innerText = `Connected via ${vpn.active_tunnel?.protocol || 'Secure Tunnel'} (${vpn.active_tunnel?.interface || 'tun'}). Upstream ISP cannot inspect payload.`;
+        gradeDisplay.innerText = audit.grade || "A+ (Protected)";
+        gradeDisplay.className = "text-3xl sm:text-4xl font-black font-mono text-emerald-400";
+        scoreDisplay.innerText = `${audit.score || 96}/100`;
+        scoreSub.innerText = "Hardened";
+        scoreSub.className = "text-[10px] text-emerald-400 font-semibold block";
+      } else {
+        hero.className = "p-7 rounded-3xl border transition-all duration-700 flex flex-col lg:flex-row items-center justify-between gap-6 relative overflow-hidden glass-box neon-border-red";
+        ambient.className = "absolute -right-20 -top-20 w-96 h-96 rounded-full blur-3xl opacity-20 pointer-events-none transition-all duration-700 bg-rose-500";
+        shieldContainer.className = "w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex items-center justify-center text-4xl sm:text-5xl shadow-2xl transition-all duration-500 border bg-rose-950/80 text-rose-400 border-rose-600/80 shadow-rose-500/25";
+        shieldIcon.className = "fa-solid fa-triangle-exclamation";
+        heroTitle.innerText = "No VPN Detected — Exposed";
+        heroBadge.className = "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider font-mono bg-rose-950 text-rose-300 border border-rose-800";
+        heroBadge.innerText = "EXPOSED";
+        heroDesc.innerText = `Traffic routes directly through ${id.isp || 'your ISP'} with zero encapsulation. Real location and browsing queries are publicly traceable.`;
+        gradeDisplay.innerText = audit.grade || "D- (Exposed)";
+        gradeDisplay.className = "text-3xl sm:text-4xl font-black font-mono text-rose-500";
+        scoreDisplay.innerText = `${audit.score || 38}/100`;
+        scoreSub.innerText = "Vulnerable";
+        scoreSub.className = "text-[10px] text-rose-400 font-semibold block";
+      }
+
+      pingDisplay.innerText = `${bench.cloudflare_dns_ms || '--'} ms`;
+
+      // 2. Metrics Cards
+      const vpnPill = document.getElementById('vpn-active-pill');
+      const vpnName = document.getElementById('active-vpn-name');
+      const vpnDetail = document.getElementById('vpn-detail-desc');
+      const vpnIface = document.getElementById('vpn-interface');
+      const vpnMtu = document.getElementById('vpn-mtu');
+
+      if (vpn.is_connected && vpn.active_tunnel) {
+        vpnPill.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono font-semibold";
+        vpnPill.innerText = "ONLINE";
+        vpnName.innerText = vpn.active_tunnel.protocol;
+        vpnDetail.innerText = `Encapsulated tunnel interface active on ${vpn.active_tunnel.interface}.`;
+        vpnIface.innerText = vpn.active_tunnel.interface;
+        vpnMtu.innerText = `${vpn.active_tunnel.mtu || 1420} (Tunnel MTU)`;
+      } else {
+        vpnPill.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono font-semibold";
+        vpnPill.innerText = "DISCONNECTED";
+        vpnName.innerText = "Direct Interface";
+        vpnDetail.innerText = "No active tunnel daemon (WireGuard, OpenVPN, StrongSwan) detected.";
+        vpnIface.innerText = "None (Raw eth/wlan)";
+        vpnMtu.innerText = "1500 (Standard MTU)";
+      }
+
+      // Public Identity
+      document.getElementById('public-ip').innerHTML = `<span>${id.ip || 'Unreachable'}</span> <i class="fa-regular fa-copy text-xs text-slate-500 hover:text-cyan-300 cursor-pointer" onclick="navigator.clipboard.writeText('${id.ip}'); showToast('IP copied to clipboard!')"></i>`;
+      document.getElementById('public-isp').innerText = id.isp || 'Searching ISP...';
+      document.getElementById('geo-location').innerText = `${id.city || 'Unknown'}, ${id.country || 'IN'}`;
+      document.getElementById('geo-asn').innerText = id.asn || 'AS55836';
+
+      const leakPill = document.getElementById('leak-alert-pill');
+      if (vpn.is_connected) {
+        leakPill.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono font-bold";
+        leakPill.innerText = "IP Masked";
+      } else {
+        leakPill.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 font-mono font-bold";
+        leakPill.innerText = "ISP Exposed";
+      }
+
+      // DNS Card
+      if (vpn.dns_servers && vpn.dns_servers.length > 0) {
+        document.getElementById('dns-server-display').innerText = vpn.dns_servers[0];
+      }
+      const dnsPill = document.getElementById('dns-status-pill');
+      const dnsLeakText = document.getElementById('dns-leak-text');
+      if (vpn.is_connected) {
+        dnsPill.className = "text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800";
+        dnsPill.innerText = "Tunnel DNS";
+        dnsLeakText.innerText = "Protected (In-Tunnel)";
+        dnsLeakText.className = "text-emerald-400 font-semibold";
+      } else {
+        dnsPill.className = "text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold bg-amber-950 text-amber-300 border border-amber-800";
+        dnsPill.innerText = "ISP Resolver";
+        dnsLeakText.innerText = "High (Plain UDP 53)";
+        dnsLeakText.className = "text-rose-400 font-semibold";
+      }
+
+      // Map Update
+      if (id.loc) {
+        const [lat, lng] = id.loc.split(',').map(Number);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          initMap(lat, lng, `${id.city}, ${id.country}`);
+          const nodeLabel = document.getElementById('map-node-label');
+          if (nodeLabel) nodeLabel.innerText = `${id.city}, ${id.region} (${id.country})`;
+          const coords = document.getElementById('map-coords');
+          if (coords) coords.innerText = `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E`;
+        }
+      }
+    }
+
+    // Ping Probes & Dynamic Latency Bars
+    async function runPingTest() {
+      try {
+        const res = await fetch('/api/ping-test');
+        const data = await res.json();
+        if (data.results) {
+          data.results.forEach(r => {
+            const ms = r.latency_ms;
+            const barWidth = Math.min(Math.max((ms / 150) * 100, 10), 100);
+
+            if (r.name.includes("Cloudflare")) {
+              document.getElementById('ping-cf').innerText = `${ms} ms`;
+              document.getElementById('bar-cf').style.width = `${barWidth}%`;
+            }
+            if (r.name.includes("Google")) {
+              document.getElementById('ping-google').innerText = `${ms} ms`;
+              document.getElementById('bar-google').style.width = `${barWidth}%`;
+            }
+            if (r.name.includes("Quad9")) {
+              document.getElementById('ping-quad9').innerText = `${ms} ms`;
+              document.getElementById('bar-quad9').style.width = `${barWidth}%`;
+            }
+            if (r.name.includes("Mullvad")) {
+              document.getElementById('ping-mullvad').innerText = `${ms} ms`;
+              document.getElementById('bar-mullvad').style.width = `${barWidth}%`;
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Ping test error:", e);
+      }
+    }
+
+    // Run Full Security Audit
+    async function runAudit() {
+      try {
+        const res = await fetch('/api/audit');
+        const data = await res.json();
+        
+        document.getElementById('audit-score-num').innerText = `${data.score}/100`;
+        document.getElementById('audit-grade-char').innerText = data.grade;
+        document.getElementById('audit-verdict').innerText = data.verdict;
+        
+        if (data.score >= 90) {
+          document.getElementById('audit-score-num').className = "text-5xl font-black font-mono text-emerald-400 mt-2";
+          document.getElementById('audit-grade-char').className = "text-5xl font-black font-mono text-emerald-400 mt-2";
+          document.getElementById('audit-verdict').className = "text-xs font-bold text-emerald-400 mt-2 uppercase tracking-wider";
+        } else {
+          document.getElementById('audit-score-num').className = "text-5xl font-black font-mono text-rose-500 mt-2";
+          document.getElementById('audit-grade-char').className = "text-5xl font-black font-mono text-rose-500 mt-2";
+          document.getElementById('audit-verdict').className = "text-xs font-bold text-rose-400 mt-2 uppercase tracking-wider";
+        }
+
+        const penalties = data.checks.reduce((acc, c) => acc + (c.penalty || 0), 0);
+        document.getElementById('audit-penalties').innerText = `-${penalties} PTS`;
+
+        const list = document.getElementById('audit-checks-list');
+        list.innerHTML = data.checks.map(c => {
+          const isPass = c.status === "PASS";
+          const isWarn = c.status === "WARN";
+          const badgeClass = isPass 
+            ? "bg-emerald-950 text-emerald-300 border-emerald-800" 
+            : (isWarn ? "bg-amber-950 text-amber-300 border-amber-800" : "bg-rose-950 text-rose-300 border-rose-800");
+          const icon = isPass ? "fa-circle-check text-emerald-400" : (isWarn ? "fa-triangle-exclamation text-amber-400" : "fa-circle-xmark text-rose-400");
+          
+          return `
+            <div class="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3">
+                <i class="fa-solid ${icon} text-lg mt-0.5"></i>
+                <div>
+                  <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                    ${c.name}
+                    <span class="text-[10px] font-mono text-slate-500">[${c.id}]</span>
+                  </h4>
+                  <p class="text-xs text-slate-400 mt-1">${c.desc}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold border ${badgeClass}">
+                  ${c.status}
+                </span>
+                ${c.penalty > 0 ? `<span class="block text-[10px] font-mono text-rose-400 mt-1">-${c.penalty} pts</span>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (e) {
+        console.error("Audit error:", e);
+      }
+    }
+
+    // Load VPN Recommendations
+    async function loadRecommendations() {
+      try {
+        const res = await fetch('/api/vpn/recommendations');
+        const data = await res.json();
+        allRecommendations = data.recommendations || [];
+        renderRecommendations(allRecommendations);
+      } catch (e) {
+        console.error("Error loading recommendations:", e);
+      }
+    }
+
+    function renderRecommendations(items) {
+      const container = document.getElementById('recommendation-cards');
+      if (!items || items.length === 0) {
+        container.innerHTML = `<div class="col-span-2 text-center text-slate-500 py-12 font-mono">No recommendations found for this filter.</div>`;
+        return;
+      }
+
+      container.innerHTML = items.map((rec) => `
+        <div class="glass-box p-6 rounded-3xl flex flex-col justify-between space-y-4 hover:border-cyan-500/40 transition-all duration-300 group">
+          <div>
+            <!-- Header Badge & Rating -->
+            <div class="flex items-center justify-between mb-3.5">
+              <span class="text-[11px] px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-cyan-950/80 text-cyan-300 border border-cyan-800/70 font-mono shadow-sm">
+                ${rec.badge}
+              </span>
+              <div class="flex items-center space-x-1.5 bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-900/40">
+                <i class="fa-solid fa-star text-amber-400 text-xs"></i>
+                <span class="text-white text-sm font-mono font-black">${rec.score}/100</span>
+              </div>
+            </div>
+
+            <!-- Title & Sub -->
+            <h3 class="text-xl font-bold text-white tracking-tight mb-1 group-hover:text-cyan-300 transition-colors">${rec.name}</h3>
+            <p class="text-xs text-cyan-400/90 font-medium mb-4 flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-notch text-[10px]"></i> ${rec.suitability}
+            </p>
+
+            <!-- Tech Spec Chips -->
+            <div class="grid grid-cols-2 gap-2 text-xs bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800/80 mb-4 font-mono">
+              <div>
+                <span class="text-slate-500 text-[10px] uppercase block">Cryptography:</span>
+                <span class="text-slate-200 font-semibold text-[11px] truncate block">${rec.cipher}</span>
+              </div>
+              <div>
+                <span class="text-slate-500 text-[10px] uppercase block">Kernel Engine:</span>
+                <span class="text-slate-200 text-[11px]">${rec.kernel_module}</span>
+              </div>
+              <div>
+                <span class="text-slate-500 text-[10px] uppercase block">Bandwidth Overhead:</span>
+                <span class="text-slate-200 text-[11px]">${rec.bandwidth_overhead}</span>
+              </div>
+              <div>
+                <span class="text-slate-500 text-[10px] uppercase block">Quantum-Ready:</span>
+                <span class="text-cyan-300 text-[11px]">${rec.quantum_ready}</span>
+              </div>
+              <div class="col-span-2 mt-1 border-t border-slate-900 pt-1.5 font-sans">
+                <span class="text-slate-500 text-[10px] uppercase font-mono block">Optimal Scenario:</span>
+                <span class="text-slate-300 text-[11px] font-medium leading-relaxed">${rec.best_for}</span>
+              </div>
+            </div>
+
+            <!-- Advantages List -->
+            <div class="space-y-1.5 text-xs">
+              <p class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-check"></i> Key Operational Strengths
+              </p>
+              ${rec.pros.map(p => `
+                <div class="flex items-start gap-2 text-slate-300 pl-1">
+                  <span class="text-emerald-400 text-xs mt-0.5">•</span>
+                  <span class="text-xs">${p}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Bottom Actions: Copy Command & View Config -->
+          <div class="pt-4 border-t border-slate-800/80 space-y-2">
+            <span class="text-[10px] text-slate-400 uppercase font-mono block flex items-center justify-between">
+              <span>Quick Deployment Command:</span>
+              <button onclick="viewConfig('${rec.name}', \`${rec.config_template.replace(/`/g, '\\`')}\`)" class="text-[10px] text-cyan-400 hover:underline">
+                <i class="fa-solid fa-sliders"></i> View Config
+              </button>
+            </span>
+            <div class="flex items-center justify-between bg-black/80 px-3.5 py-2.5 rounded-xl border border-slate-800 font-mono text-[11px] text-cyan-300 group-hover:border-cyan-800/60 transition-colors">
+              <code class="truncate select-all">${rec.how_to_run}</code>
+              <button onclick="navigator.clipboard.writeText('${rec.how_to_run}'); showToast('Command copied: ${rec.name}');" class="text-slate-400 hover:text-white p-1 rounded transition ml-2">
+                <i class="fa-regular fa-copy text-sm"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function viewConfig(title, content) {
+      document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-file-code text-cyan-400"></i> ${title} Template`;
+      document.getElementById('modal-code').innerText = content;
+      document.getElementById('config-modal').showModal();
+    }
+
+    function filterRecs(type) {
+      document.querySelectorAll('.rec-filter').forEach(btn => {
+        if (btn.dataset.filter === type) {
+          btn.className = "rec-filter px-3.5 py-1.5 text-xs rounded-xl bg-cyan-500 text-slate-950 font-bold transition shadow-md shadow-cyan-500/20";
+        } else {
+          btn.className = "rec-filter px-3.5 py-1.5 text-xs rounded-xl bg-slate-800/80 text-slate-300 hover:bg-slate-700 font-semibold transition";
+        }
+      });
+
+      if (type === 'all') {
+        renderRecommendations(allRecommendations);
+      } else if (type === 'speed') {
+        renderRecommendations(allRecommendations.filter(r => r.id === 'wireguard' || r.id === 'tailscale'));
+      } else if (type === 'security') {
+        renderRecommendations(allRecommendations.filter(r => r.id === 'ipsec_ikev2' || r.id === 'wireguard'));
+      } else if (type === 'firewall') {
+        renderRecommendations(allRecommendations.filter(r => r.id === 'openvpn_stealth' || r.id === 'shadowsocks_v2ray'));
+      }
+    }
+
+    // Load Interfaces & Routes Table
+    async function loadInterfacesAndRoutes() {
+      try {
+        const [ifaceRes, routesRes] = await Promise.all([
+          fetch('/api/interfaces'),
+          fetch('/api/routes')
+        ]);
+        const ifaceData = await ifaceRes.json();
+        const routesData = await routesRes.json();
+
+        const ifaceTbody = document.getElementById('interfaces-tbody');
+        if (ifaceData.interfaces) {
+          ifaceTbody.innerHTML = ifaceData.interfaces.map(i => `
+            <tr class="hover:bg-slate-900/60 transition">
+              <td class="p-3 font-bold text-white">${i.name}</td>
+              <td class="p-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${i.is_up ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-800 text-slate-400'}">
+                  ${i.state}
+                </span>
+              </td>
+              <td class="p-3 text-slate-400">${i.type}</td>
+              <td class="p-3 text-cyan-300">${i.mtu}</td>
+              <td class="p-3 text-slate-400">${i.mac}</td>
+            </tr>
+          `).join('');
+        }
+
+        const routesTbody = document.getElementById('routes-tbody');
+        if (routesData.routes) {
+          routesTbody.innerHTML = routesData.routes.map(r => `
+            <tr class="hover:bg-slate-900/60 transition">
+              <td class="p-3 font-bold text-cyan-300">${r.destination}</td>
+              <td class="p-3 text-slate-300">${r.gateway}</td>
+              <td class="p-3 text-slate-400">${r.interface}</td>
+              <td class="p-3 text-slate-500">${r.metric}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (e) {
+        console.error("Error loading interfaces/routes:", e);
+      }
+    }
+
+    // Connect WebSocket for Live 2s Streaming
+    function connectWS() {
+      const wsStatus = document.getElementById('ws-status');
+      const wsDot = document.getElementById('ws-indicator-dot');
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/live`;
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        if (wsStatus) {
+          wsStatus.innerText = "2s Ticks";
+          wsStatus.className = "text-emerald-400 font-semibold";
+        }
+        if (wsDot) wsDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse";
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'heartbeat') {
+            updateUI({
+              vpn: payload.vpn,
+              identity: payload.identity,
+              audit: payload.audit,
+              security: {
+                is_exposed: !payload.is_protected,
+              },
+              benchmarks: {
+                cloudflare_dns_ms: payload.latency_ms
+              }
+            });
+          }
+        } catch (e) {
+          console.error("WS Parse error", e);
+        }
+      };
+
+      ws.onclose = () => {
+        if (wsStatus) {
+          wsStatus.innerText = "Reconnecting...";
+          wsStatus.className = "text-amber-400 font-semibold";
+        }
+        if (wsDot) wsDot.className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping";
+        setTimeout(connectWS, 3000);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+    }
+
+    // Initialize App
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchStatus();
+      loadRecommendations();
+      connectWS();
+      runPingTest();
+    });
+  </script>
+</body>
+</html>
