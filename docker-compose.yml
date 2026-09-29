@@ -1,0 +1,12 @@
+services:
+  ipsec-xray:
+    build: .
+    ports: ["8000:8000"]
+    # Live mode: replay/agent/upload sources work as-is. To sniff the *host's* interfaces from inside the
+    # container, uncomment the two lines below (raw sockets + host network namespace):
+    # network_mode: host
+    # cap_add: [NET_RAW, NET_ADMIN]
+    volumes: ["xray-data:/app/data"]
+    restart: unless-stopped
+volumes:
+  xray-data:

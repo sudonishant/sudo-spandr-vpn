@@ -1,0 +1,77 @@
+# Threat matrix. likelihood/impact 1..5. `base_likelihood` applies when no linked check fires;
+# each firing check raises likelihood to at least `trigger_likelihood` (per severity).
+threats:
+- id: TH-01
+  title: Passive decryption via weak DH (Logjam-class)
+  actor: Nation-state / well-resourced passive adversary
+  impact: 5
+  base_likelihood: 1
+  description: "Precomputation against 768/1024-bit MODP groups lets a passive observer recover session keys."
+- id: TH-02
+  title: Harvest-now-decrypt-later (no PFS / no PQC)
+  actor: Long-term recording adversary
+  impact: 5
+  base_likelihood: 2
+  description: "Recorded ciphertext becomes readable when the long-term key leaks (no PFS) or when quantum computers break classical KE."
+- id: TH-03
+  title: Weak / NULL cipher exposure (Sweet32, DES brute force)
+  actor: Passive observer on the path
+  impact: 5
+  base_likelihood: 1
+  description: "64-bit block ciphers leak plaintext after ~32 GB; DES is brute-forceable; NULL is cleartext."
+- id: TH-04
+  title: IKEv1 protocol attacks (Bleichenbacher oracles, aggressive mode)
+  actor: Active on-path attacker
+  impact: 4
+  base_likelihood: 1
+  description: "Legacy IKEv1 modes have known cryptographic and implementation weaknesses."
+- id: TH-05
+  title: Integrity / MAC weaknesses (MD5, SHA-1-96)
+  actor: Active attacker
+  impact: 3
+  base_likelihood: 1
+  description: "Deprecated MACs and non-AEAD constructions widen the forgery / padding-oracle surface."
+- id: TH-06
+  title: Downgrade to weak proposal
+  actor: Active MITM
+  impact: 4
+  base_likelihood: 1
+  description: "Weak transforms in the offered list let an attacker steer negotiation to a breakable suite."
+- id: TH-07
+  title: Credential / PSK compromise
+  actor: Offline cracker, rogue gateway
+  impact: 5
+  base_likelihood: 1
+  description: "PSK hashes exposed by aggressive mode or XAUTH can be brute-forced; password EAP methods are phishable."
+- id: TH-08
+  title: Metadata & traffic-analysis leakage
+  actor: Passive observer
+  impact: 3
+  base_likelihood: 3
+  description: "Packet sizes and timing reveal application type, identities and topology even when encryption is strong."
+- id: TH-09
+  title: Replay / injection
+  actor: Active on-path attacker
+  impact: 3
+  base_likelihood: 1
+  description: "Replayed or forged ESP packets when anti-replay is disabled or sequence handling is broken."
+- id: TH-10
+  title: Availability attacks (IKE flood, fragmentation)
+  actor: Remote unauthenticated attacker
+  impact: 3
+  base_likelihood: 2
+  description: "Half-open IKE SAs, fragmentation and malformed messages exhaust gateway resources."
+- id: TH-11
+  title: Reconnaissance & fingerprinting
+  actor: Scanner / attacker preparing exploitation
+  impact: 2
+  base_likelihood: 3
+  description: "Vendor IDs, ports and NAT behaviour identify the product and version."
+- id: TH-12
+  title: Policy / configuration drift
+  actor: Insider error, unmanaged change
+  impact: 3
+  base_likelihood: 2
+  description: "Inconsistent suites and lifetimes across peers create unnoticed weak links."
+
+trigger_likelihood: {critical: 5, high: 4, medium: 3, low: 2, info: 1}

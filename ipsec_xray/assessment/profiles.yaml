@@ -1,0 +1,41 @@
+# Assessment profiles: parameters referenced by checks as profile.<name>
+profiles:
+  baseline:
+    label: Baseline (RFC 8221 / 8247)
+    description: "IETF mandatory-to-implement floor. Anything that violates a MUST NOT / SHOULD NOT is flagged."
+    max_ike_lifetime: 86400
+    max_child_lifetime: 28800
+    legacy_max_bytes: 1000000000
+    require_aes256: false
+    allowed_peers: []
+  enterprise:
+    label: Enterprise (NIST SP 800-77r1)
+    description: "Corporate VPN baseline: no PSK for site-to-site, PFS required, 8 h child lifetimes."
+    max_ike_lifetime: 28800
+    max_child_lifetime: 10800
+    legacy_max_bytes: 1000000000
+    require_aes256: false
+    allowed_peers: []
+  government:
+    label: Government (CNSA 2.0 / NIST high)
+    description: "AES-256, SHA-384, ECP-384/MODP-3072+, certificates, PFS, 1 h child lifetimes."
+    max_ike_lifetime: 28800
+    max_child_lifetime: 3600
+    legacy_max_bytes: 100000000
+    require_aes256: true
+    allowed_peers: []
+  pqc_ready:
+    label: PQC-ready (CNSA 2.0 + ML-KEM hybrid)
+    inherits: government
+    description: "Government profile plus mandatory hybrid post-quantum key exchange (RFC 9370 + ML-KEM)."
+    max_ike_lifetime: 28800
+    max_child_lifetime: 3600
+    legacy_max_bytes: 100000000
+    require_aes256: true
+    allowed_peers: []
+
+scoring:
+  domains: {ke: 20, conf: 20, integ: 15, fs: 15, replay: 10, meta: 10, hygiene: 10}
+  domain_labels: {ke: "Key exchange & protocol", conf: "Confidentiality", integ: "Integrity", fs: "Forward secrecy & lifetimes",
+                  replay: "Anti-replay", meta: "Metadata exposure", hygiene: "Network & configuration hygiene"}
+  grades: [["A+", 95], ["A", 85], ["B", 75], ["C", 60], ["D", 40], ["F", 0]]

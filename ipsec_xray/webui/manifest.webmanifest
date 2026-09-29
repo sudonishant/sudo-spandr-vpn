@@ -1,0 +1,16 @@
+{
+  "name": "IPsec X-Ray — live VPN analyzer",
+  "short_name": "IPsec X-Ray",
+  "description": "Real-time IPsec/IKE/ESP packet view with AI-assisted security assessment (SIH26160).",
+  "start_url": "/#/live",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f3f5f9",
+  "theme_color": "#1F4E79",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

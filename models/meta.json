@@ -1,0 +1,77 @@
+{
+  "trained_at": "2026-09-28 16:41:00",
+  "flows": 1760,
+  "flows_per_class": 220,
+  "real_flows": 0,
+  "sklearn": "1.9.1",
+  "note": "Trained on simulated flows framed with the exact ESP length model. For production use, record captures with testbed/strongswan/capture.sh and retrain with `python -m ipsec_xray.ml.train --real testbed/strongswan/pcaps`.",
+  "models": {
+    "traffic": {
+      "file": "traffic_rf.joblib",
+      "holdout_accuracy": 1.0,
+      "classes": [
+        "chat",
+        "email",
+        "file",
+        "icmp",
+        "ssh",
+        "video",
+        "voip",
+        "web"
+      ],
+      "n_features": 37,
+      "per_class_f1": {
+        "chat": 1.0,
+        "email": 1.0,
+        "file": 1.0,
+        "icmp": 1.0,
+        "ssh": 1.0,
+        "video": 1.0,
+        "voip": 1.0,
+        "web": 1.0
+      }
+    },
+    "cipher": {
+      "file": "cipher_rf.joblib",
+      "holdout_accuracy": 0.8608,
+      "classes": [
+        "o12_b4",
+        "o16_b4",
+        "o20_b4",
+        "o20_b8",
+        "o24_b4",
+        "o24_b8",
+        "o28_b16",
+        "o32_b16",
+        "o40_b16",
+        "o48_b16"
+      ],
+      "n_features": 36,
+      "per_class_f1": {
+        "o12_b4": 0.8,
+        "o16_b4": 0.767,
+        "o20_b4": 0.538,
+        "o20_b8": 0.863,
+        "o24_b4": 0.902,
+        "o24_b8": 0.696,
+        "o28_b16": 0.972,
+        "o32_b16": 0.909,
+        "o40_b16": 0.941,
+        "o48_b16": 0.48
+      }
+    },
+    "mode": {
+      "file": "mode_rf.joblib",
+      "holdout_accuracy": 0.9574,
+      "classes": [
+        "transport",
+        "tunnel"
+      ],
+      "n_features": 59,
+      "per_class_f1": {
+        "transport": 0.911,
+        "tunnel": 0.972
+      }
+    }
+  }
+}

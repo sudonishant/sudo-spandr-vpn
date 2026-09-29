@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>IPsec X-Ray {{ kind|title }} Report - {{ r.name }}</title>
+<style>
+  :root { --navy:#1F4E79; --blue:#0070C0; --green:#2E7D32; --amber:#EF6C00; --red:#C62828; --purple:#7030A0; --gray:#607D8B; }
+  body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color:#1b2733; margin:0; background:#f4f6f9; }
+  .page { max-width: 1100px; margin: 0 auto; padding: 28px 36px 60px; background:#fff; }
+  h1 { color: var(--navy); margin: 0 0 4px; font-size: 26px; }
+  h2 { color: var(--navy); border-bottom: 2px solid #dde5ee; padding-bottom: 4px; margin-top: 34px; font-size: 19px; }
+  h3 { color: var(--blue); margin: 18px 0 6px; font-size: 15px; }
+  .sub { color:#5c6b7a; font-size: 13px; }
+  .kpis { display:flex; gap:16px; margin: 18px 0; flex-wrap: wrap; }
+  .kpi { flex:1; min-width: 150px; border:1px solid #dde5ee; border-radius: 10px; padding: 12px 14px; background:#fbfcfe; }
+  .kpi .v { font-size: 30px; font-weight: 700; }
+  .kpi .l { font-size: 12px; color:#5c6b7a; text-transform: uppercase; letter-spacing: .04em; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 8px 0 14px; }
+  th { background:#eef3f8; text-align:left; padding: 6px 8px; border-bottom: 1px solid #cfd8e3; }
+  td { padding: 6px 8px; border-bottom: 1px solid #e6ebf1; vertical-align: top; }
+  .sev { display:inline-block; padding: 2px 8px; border-radius: 10px; color:#fff; font-size: 11px; font-weight: 600; }
+  .sev.critical { background: var(--red);} .sev.high { background:#E64A19;} .sev.medium { background: var(--amber);} .sev.low { background:#F9A825; color:#222;} .sev.info { background: var(--gray);}
+  .tier { display:inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .tier.Observed { background:#E8F5E9; color: var(--green); border:1px solid #A5D6A7;} .tier.Inferred { background:#FFF3E0; color: var(--amber); border:1px solid #FFCC80;} .tier.Unknown { background:#ECEFF1; color:#455A64; border:1px solid #B0BEC5;}
+  .bar { height: 10px; background:#e6ebf1; border-radius: 6px; overflow: hidden; }
+  .bar > span { display:block; height:100%; }
+  .tiers { display:flex; height: 14px; border-radius: 6px; overflow:hidden; margin: 6px 0; }
+  .grid { display:grid; grid-template-columns: repeat(5, 1fr); gap:3px; margin: 8px 0; max-width: 560px; }
+  .cell { min-height: 52px; font-size: 10.5px; padding: 4px; color:#1b2733; border-radius: 4px; }
+  .fix { color:#1b5e20; }
+  .muted { color:#78909c; }
+  .box { border:1px solid #dde5ee; border-radius: 10px; padding: 12px 16px; margin: 10px 0; background:#fbfcfe; }
+  .two { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  code { background:#eef3f8; padding: 1px 4px; border-radius: 3px; font-size: 11.5px; }
+  footer { margin-top: 40px; font-size: 11px; color:#78909c; border-top:1px solid #dde5ee; padding-top: 8px; }
+  @media print { body { background:#fff; } .page { padding: 0; } h2 { page-break-after: avoid; } tr { page-break-inside: avoid; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <h1>IPsec X-Ray &mdash; {{ 'Executive Summary' if kind == 'executive' else 'Technical Report' }}</h1>
+      <div class="sub">Capture: <b>{{ r.name }}</b> &middot; Profile: <b>{{ a.profile_label }}</b> &middot; Generated: {{ r.created }} &middot; Engine v{{ r.version }}</div>
+      <div class="sub">{{ f.capture.packets }} packets, {{ f.capture.duration }} s, {{ f.capture.ike_sa_count }} IKE SA(s), {{ f.capture.tunnel_count }} tunnel(s){% if f.capture.ipv6 %}, IPv6{% endif %}{% if f.capture.ipv4 %}, IPv4{% endif %}</div>
+    </div>
+    <div>{{ gauge|safe }}</div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="l">Security score</div><div class="v" style="color:{{ grade_color }}">{{ a.score }}<span style="font-size:14px;color:#5c6b7a">/100</span></div></div>
+    <div class="kpi"><div class="l">Grade</div><div class="v" style="color:{{ grade_color }}">{{ a.grade }}</div>{% if a.grade_cap %}<div class="muted" style="font-size:11px">capped by {{ a.grade_cap.reason|join(', ') }}</div>{% endif %}</div>
+    <div class="kpi"><div class="l">Risk score</div><div class="v" style="color:{{ risk_color }}">{{ a.risk_score }}</div><div class="muted" style="font-size:11px">{{ a.risk_level }} exposure</div></div>
+    <div class="kpi"><div class="l">AI confidence</div><div class="v">{{ a.ai_confidence }}%</div><div class="muted" style="font-size:11px">mean confidence of inferred fields</div></div>
+    <div class="kpi"><div class="l">Findings</div><div class="v">{{ a.counts.critical + a.counts.high + a.counts.medium + a.counts.low }}</div><div class="muted" style="font-size:11px">{{ a.counts.critical }} critical &middot; {{ a.counts.high }} high &middot; {{ a.counts.medium }} medium &middot; {{ a.counts.low }} low</div></div>
+  </div>
+
+  <div class="box">
+    <b>Evidence tiers</b> &mdash; {{ a.tiers.observed_pct }}% observed, {{ a.tiers.inferred_pct }}% inferred, {{ a.tiers.unknown_pct }}% unknown
+    <div class="tiers"><span style="width:{{ a.tiers.observed_pct }}%;background:#2E7D32"></span><span style="width:{{ a.tiers.inferred_pct }}%;background:#EF6C00"></span><span style="width:{{ a.tiers.unknown_pct }}%;background:#90A4AE"></span></div>
+    <div class="muted" style="font-size:11.5px">Observed = read from cleartext protocol fields. Inferred = derived from packet-length physics / timing / ML with the stated confidence. Unknown = not recoverable passively and reported as such.</div>
+  </div>
+
+  <h2>1. What the capture shows</h2>
+  <ul>
+    {% for s in narrative %}<li>{{ s|safe }}</li>{% endfor %}
+  </ul>
+
+  <h2>2. Score breakdown</h2>
+  <table>
+    <tr><th style="width:32%">Domain</th><th style="width:12%">Score</th><th>Bar</th></tr>
+    {% for d, v in a.domains.items() %}
+    <tr><td>{{ v.label }}</td><td>{{ v.score }} / {{ v.cap }}</td><td><div class="bar"><span style="width:{{ (100 * v.score / v.cap)|round }}%;background:{{ '#2E7D32' if v.score >= 0.8 * v.cap else ('#EF6C00' if v.score >= 0.5 * v.cap else '#C62828') }}"></span></div></td></tr>
+    {% endfor %}
+  </table>
+
+  <h2>3. Priority actions</h2>
+  {% if a.top_actions %}
+  <table>
+    <tr><th>#</th><th>Severity</th><th>Check</th><th>Recommended fix</th></tr>
+    {% for t in a.top_actions %}<tr><td>{{ loop.index }}</td><td><span class="sev {{ t.severity }}">{{ t.severity }}</span></td><td><b>{{ t.id }}</b> {{ t.title }}</td><td class="fix">{{ t.fix }}</td></tr>{% endfor %}
+  </table>
+  {% else %}<p class="muted">No corrective actions required under this profile.</p>{% endif %}
+
+  <h2>4. Findings{% if kind == 'executive' %} (non-informational){% endif %}</h2>
+  <table>
+    <tr><th>Severity</th><th>ID</th><th>Finding</th><th>Subject</th><th>Evidence</th><th>Detail</th></tr>
+    {% for x in findings_shown %}
+    <tr><td><span class="sev {{ x.severity }}">{{ x.severity }}</span></td><td><b>{{ x.id }}</b></td><td>{{ x.title }}<br><span class="muted">{{ x.ref }}</span></td><td>{{ x.subject }}</td>
+        <td><span class="tier {{ x.tier }}">{{ x.tier }}</span>{% if x.tier != 'Observed' %}<br><span class="muted">conf {{ x.confidence }}</span>{% endif %}</td>
+        <td>{{ x.message }}{% if kind != 'executive' %}<br><span class="fix">Fix: {{ x.fix }}</span>{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+
+  <h2>5. Threat matrix</h2>
+  <div class="two">
+    <div>
+      <div class="grid">
+        {% for row in matrix %}{% for cell in row %}
+        <div class="cell" style="background:{{ cell.color }}">{% if cell.ids %}<b>{{ cell.ids|join(' ') }}</b>{% endif %}<div class="muted" style="font-size:9.5px">L{{ cell.l }} &times; I{{ cell.i }}</div></div>
+        {% endfor %}{% endfor %}
+      </div>
+      <div class="muted" style="font-size:11px">Rows: likelihood 5 (top) &rarr; 1 (bottom). Columns: impact 1 &rarr; 5.</div>
+    </div>
+    <div>
+      <table>
+        <tr><th>ID</th><th>Threat</th><th>L</th><th>I</th><th>Level</th><th>Triggered by</th></tr>
+        {% for t in a.threats %}<tr><td>{{ t.id }}</td><td>{{ t.title }}</td><td>{{ t.likelihood }}</td><td>{{ t.impact }}</td><td>{{ t.level }}</td><td class="muted">{{ t.triggered_by|join(', ') }}</td></tr>{% endfor %}
+      </table>
+    </div>
+  </div>
+
+  {% if kind != 'executive' %}
+  <h2>6. Hidden-field inference (per tunnel)</h2>
+  {% for t in f.tunnels %}
+  <div class="box">
+    <h3 style="margin-top:0">{{ t.protocol }} tunnel {{ t.peers[0] }} &harr; {{ t.peers[1] }} &mdash; {{ t.packets }} packets, {{ t.bytes }} bytes, {{ t.duration }} s{% if t.udp_encap %}, UDP-encapsulated{% endif %}{% if t.ipver == 6 %}, IPv6{% endif %}</h3>
+    <table>
+      <tr><th style="width:22%">Field</th><th style="width:38%">Value</th><th>Evidence</th></tr>
+      <tr><td>Cipher framing</td><td><b>{{ t.framing.label }}</b></td><td><span class="tier {{ t.framing.tier }}">{{ t.framing.tier }}</span> conf {{ t.framing.confidence }} &middot; IV {{ t.framing.iv }} + ICV {{ t.framing.icv }} B, block {{ t.framing.block }} B{% if t.framing.physics %} &middot; physics {{ t.framing.physics.confidence }} / ML {{ t.framing.ml }}{% endif %}<br><span class="muted">{{ t.framing.note }}</span></td></tr>
+      <tr><td>Encapsulation mode</td><td><b>{{ t.mode.value }}</b></td><td><span class="tier {{ t.mode.tier }}">{{ t.mode.tier }}</span> conf {{ t.mode.confidence }} (anchor packet sizes + ML)</td></tr>
+      <tr><td>Traffic inside</td><td><b>{{ t.traffic.label }}</b></td><td><span class="tier {{ t.traffic.tier }}">{{ t.traffic.tier }}</span> conf {{ t.traffic.confidence }}{% if t.traffic.top %} &middot; top-3: {% for c in t.traffic.top %}{{ c.label }} {{ c.p }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</td></tr>
+      <tr><td>Perfect forward secrecy</td><td><b>{{ t.pfs.state }}</b>{% if t.pfs.group_guess %} ({{ t.pfs.group_guess }}){% endif %}</td><td><span class="tier {{ t.pfs.tier }}">{{ t.pfs.tier }}</span> conf {{ t.pfs.confidence }} &middot; {{ t.pfs.evidence }}</td></tr>
+      <tr><td>Anti-replay sequence</td><td>{{ 'monotonic' if t.replay.monotonic else 'anomalous' }}</td><td><span class="tier Observed">Observed</span> duplicates {{ t.replay.duplicates }}, decreases {{ t.replay.decreasing }}, max seq {{ t.replay.seq_max }}</td></tr>
+      <tr><td>Rekeys / lifetimes</td><td>{{ t.rekey_count }} rekey(s){% if t.lifetimes %} &middot; intervals {{ t.lifetimes }} s{% endif %}</td><td><span class="tier Observed">Observed</span> new SPIs on the same peer pair</td></tr>
+      <tr><td>Metadata leak meter</td><td>{{ t.leak_score }} / 100</td><td>size diversity {{ t.size_diversity }}; TFC padding {{ 'likely' if t.tfc_padding_likely else 'not seen' }}</td></tr>
+      <tr><td>ESN / AES key length / replay window</td><td>Unknown</td><td><span class="tier Unknown">Unknown</span> never transmitted on the wire</td></tr>
+    </table>
+    {% if t.framing.candidates %}
+    <div class="muted" style="font-size:11.5px">Framing candidates (physics posterior): {% for c in t.framing.candidates[:5] %}{{ c.label.split(' (')[0] }} = {{ c.posterior }}{% if not loop.last %}; {% endif %}{% endfor %}</div>
+    {% endif %}
+    <table style="margin-top:8px"><tr><th>Direction</th><th>SPI</th><th>Packets</th><th>Bytes</th><th>Len min/max</th><th>Seq</th></tr>
+    {% for fl in t.flows %}<tr><td>{{ fl.src }} &rarr; {{ fl.dst }}</td><td><code>{{ fl.spi }}</code></td><td>{{ fl.packets }}</td><td>{{ fl.bytes }}</td><td>{{ fl.len_min }} / {{ fl.len_max }}</td><td>{{ fl.seq.min }}..{{ fl.seq.max }}{% if fl.seq.duplicates %} dup {{ fl.seq.duplicates }}{% endif %}</td></tr>{% endfor %}
+    </table>
+  </div>
+  {% else %}<p class="muted">No ESP/AH tunnels in the capture.</p>{% endfor %}
+
+  <h2>7. IKE negotiation details</h2>
+  {% for i in f.ike %}{% if i.complete %}
+  <div class="box">
+    <h3 style="margin-top:0">IKEv{{ i.version }} {{ i.initiator }} &rarr; {{ i.responder }}{% if i.v1_mode %} ({{ i.v1_mode }} mode){% endif %} &middot; ports {{ i.ports|join('/') }} &middot; {{ i.messages }} messages over {{ i.duration }} s</h3>
+    <table>
+      <tr><th style="width:22%">Field</th><th>Value</th><th style="width:14%">Evidence</th></tr>
+      <tr><td>Encryption</td><td>{{ i.encr_label }}{% if i.encr_aead %} (AEAD){% endif %}</td><td><span class="tier Observed">Observed</span></td></tr>
+      <tr><td>PRF / Integrity</td><td>{{ i.prf }} / {{ i.integ or ('none (AEAD)' if i.encr_aead else '-') }}</td><td><span class="tier Observed">Observed</span></td></tr>
+      <tr><td>Key exchange</td><td>{{ i.dh }} ({{ i.dh_bits }}-bit security, RFC 8247: {{ i.dh_status }}){% if i.pqc_hybrid %} + <b>{{ i.pqc_groups|join(', ') }}</b> hybrid{% endif %}</td><td><span class="tier Observed">Observed</span></td></tr>
+      <tr><td>Authentication</td><td>{{ i.auth.method or 'not visible' }}{% if i.auth.evidence %} &mdash; {{ i.auth.evidence }}{% endif %}{% if i.auth.note %} &mdash; {{ i.auth.note }}{% endif %}</td><td><span class="tier {{ i.auth.tier }}">{{ i.auth.tier }}</span>{% if i.auth.confidence %} {{ i.auth.confidence }}{% endif %}</td></tr>
+      <tr><td>Offered proposals ({{ i.offered_count }})</td><td>{% for p in i.offered %}<code>{{ p }}</code><br>{% endfor %}{% if i.weak_offered %}<span style="color:#C62828">weak: {{ i.weak_offered|join(', ') }}</span>{% endif %}</td><td><span class="tier Observed">Observed</span></td></tr>
+      <tr><td>Notifications</td><td>{{ i.notifies|join(', ') }}</td><td></td></tr>
+      {% if i.vendor_ids %}<tr><td>Vendor IDs</td><td>{% for v in i.vendor_ids %}{{ v.vendor }} <code>{{ v.hex }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</td><td><span class="tier Observed">Observed</span></td></tr>{% endif %}
+      {% if i.ids %}<tr><td>Identities (cleartext)</td><td style="color:#C62828">{% for x in i.ids %}{{ x.type_name }}: {{ x.value }}{% if not loop.last %}, {% endif %}{% endfor %}</td><td><span class="tier Observed">Observed</span></td></tr>{% endif %}
+      {% if i.lifetime_seconds %}<tr><td>IKE lifetime</td><td>{{ i.lifetime_seconds }} s</td><td><span class="tier Observed">Observed</span></td></tr>{% endif %}
+      <tr><td>Exchanges</td><td>{% for k, v in i.exchanges.items() %}{{ k }} &times;{{ v }}{% if not loop.last %}, {% endif %}{% endfor %}</td><td></td></tr>
+      <tr><td>NAT-T</td><td>{{ 'in use (UDP 4500)' if i.nat_t else ('capable, not used' if i.natt_capable else 'no') }}</td><td><span class="tier Observed">Observed</span></td></tr>
+    </table>
+  </div>
+  {% endif %}{% endfor %}
+  {% if f.capture.incomplete_sas %}<p class="muted">{{ f.capture.incomplete_sas }} incomplete IKE SA(s) (IKE_SA_INIT without IKE_AUTH) from {{ f.capture.incomplete_sources }} source address(es) were summarised as a flood indicator.</p>{% endif %}
+
+  <h2>8. Check catalogue status ({{ a.checks_total }} checks)</h2>
+  <table>
+    <tr><th>ID</th><th>Check</th><th>Scope</th><th>Severity</th><th>Status</th></tr>
+    {% for c in a.check_results %}<tr><td>{{ c.id }}</td><td>{{ c.title }}</td><td>{{ c.scope }}</td><td>{{ c.severity }}</td><td>{% if c.status == 'fail' %}<b style="color:#C62828">FAIL</b> ({{ c.count }}){% elif c.status == 'info' %}<span style="color:#EF6C00">INFO</span>{% elif c.status == 'na' %}<span class="muted">n/a</span>{% else %}<span style="color:#2E7D32">pass</span>{% endif %}</td></tr>{% endfor %}
+  </table>
+
+  <h2>9. Methodology and limits</h2>
+  <div class="box" style="font-size:12.5px">
+    <p><b>Parsing.</b> IKEv1/IKEv2 headers and cleartext payloads (SA proposals, KE group, notifications, vendor IDs, identities) are decoded byte-exactly; ESP/AH give SPI, sequence number and length. Encrypted payloads are used only through their sizes.</p>
+    <p><b>Length physics.</b> ESP payload length = IV + ceil((P+2)/block)&middot;block + ICV. Residues mod 16/8/4 identify the cipher framing; well-known inner packet sizes (52-byte TCP ACK, 84-byte ping, 200-byte G.711 frame) pin the IV+ICV overhead and the encapsulation mode. Posteriors are Bayesian with mild deployment priors; a RandomForest trained on physically framed synthetic flows is blended in (0.6 physics / 0.4 ML).</p>
+    <p><b>Traffic classification.</b> 37 flow features (sizes, inter-arrival times, burstiness, direction ratios) &rarr; calibrated RandomForest over 8 classes. The shipped model is trained on simulated flows; retrain with lab captures (<code>python -m ipsec_xray.ml.train</code>) before relying on it operationally.</p>
+    <p><b>Honest limits.</b> AES-128 vs AES-256, AES-GCM vs ChaCha20-Poly1305, and HMAC-SHA1-96 vs HMAC-MD5-96 share identical on-wire framing and cannot be separated passively. ESN, anti-replay window size and the IKEv2 authentication method are never visible. PFS is inferred from rekey message sizes and needs a rekey inside the capture. Confidence below 0.6 is reported as Unknown, never guessed.</p>
+    <p><b>Standards.</b> RFC 4301/4302/4303, RFC 7296, RFC 8221, RFC 8247, RFC 9370, RFC 9395, NIST SP 800-77r1, NSA CNSA 2.0, draft-ietf-ipsecme-ikev2-mlkem.</p>
+  </div>
+  {% endif %}
+
+  <footer>IPsec X-Ray v{{ r.version }} &middot; SIH 2026 problem statement SIH26160 (NTRO) &middot; Team Sudo Spandr &middot; passive analysis only: no keys, no decryption, no traffic injection.</footer>
+</div>
+</body>
+</html>

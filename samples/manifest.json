@@ -1,0 +1,140 @@
+{
+  "good_ikev2_gcm_pqc_pfs": {
+    "ike_version": 2,
+    "ike": "AES_GCM_16-256 / PRF_HMAC_SHA2_384 / ECP-384 + ML-KEM-1024",
+    "esp_framing": "o24_b4",
+    "esp": "AES-GCM-16 (AEAD)",
+    "mode": "tunnel",
+    "traffic": "voip",
+    "pfs": "on",
+    "pfs_group": "ECP-384",
+    "ipver": 4,
+    "expected_grade": [
+      "A+",
+      "A"
+    ],
+    "description": "Best-practice IKEv2 site-to-site tunnel: AES-256-GCM, ECP-384 with ML-KEM-1024 hybrid key exchange, certificate auth, PFS on every rekey, VoIP call inside.",
+    "file": "good_ikev2_gcm_pqc_pfs.pcap",
+    "size_bytes": 895147
+  },
+  "enterprise_cbc_sha256_natt": {
+    "ike_version": 2,
+    "ike": "AES_CBC-256 / HMAC_SHA2_256_128 / MODP-2048",
+    "esp_framing": "o32_b16",
+    "esp": "AES-CBC + HMAC-SHA2-256-128",
+    "mode": "tunnel",
+    "traffic": "web",
+    "pfs": "off",
+    "ipver": 4,
+    "expected_grade": [
+      "B",
+      "C"
+    ],
+    "description": "Typical enterprise remote-access profile: AES-CBC-256 + SHA-256 + MODP-2048, but weak fallbacks (SHA-1, MODP-1024) still offered, PSK-sized auth, Child SA rekey without PFS, NAT-T.",
+    "file": "enterprise_cbc_sha256_natt.pcap",
+    "size_bytes": 2105351
+  },
+  "legacy_ikev1_aggressive_3des": {
+    "ike_version": 1,
+    "ike": "3DES_CBC / SHA1 / MODP-1024, aggressive mode, XAUTH-PSK",
+    "esp_framing": "o20_b8",
+    "esp": "3DES-CBC + HMAC-SHA1-96",
+    "mode": "tunnel",
+    "traffic": "email",
+    "pfs": "off",
+    "ipver": 4,
+    "expected_grade": [
+      "F",
+      "D"
+    ],
+    "description": "Legacy Cisco-style remote access: IKEv1 aggressive mode with XAUTH/PSK (offline PSK cracking), 3DES/SHA-1/MODP-1024 (Sweet32 + Logjam class), identities leaked in cleartext, no PFS.",
+    "file": "legacy_ikev1_aggressive_3des.pcap",
+    "size_bytes": 1354358
+  },
+  "terrible_ikev1_des_md5_null_esp": {
+    "ike_version": 1,
+    "ike": "DES_CBC / MD5 / MODP-768, main mode, PSK",
+    "esp_framing": "o12_b4",
+    "esp": "NULL encryption + HMAC-MD5-96",
+    "mode": "tunnel",
+    "traffic": "icmp+file",
+    "pfs": "off",
+    "ipver": 4,
+    "expected_grade": [
+      "F"
+    ],
+    "description": "Worst case: DES/MD5/MODP-768 IKEv1 and ESP with NULL encryption - traffic is authenticated but readable by anyone on the path.",
+    "file": "terrible_ikev1_des_md5_null_esp.pcap",
+    "size_bytes": 2219690
+  },
+  "ipv6_natt_chacha_transport": {
+    "ike_version": 2,
+    "ike": "CHACHA20_POLY1305 / PRF_HMAC_SHA2_512 / X25519",
+    "esp_framing": "o24_b4",
+    "esp": "ChaCha20-Poly1305 (AEAD)",
+    "mode": "transport",
+    "traffic": "ssh+chat",
+    "pfs": "on",
+    "pfs_group": "ECP-256",
+    "ipver": 6,
+    "expected_grade": [
+      "A+",
+      "A"
+    ],
+    "description": "Modern host-to-host IPsec over IPv6 with UDP encapsulation: ChaCha20-Poly1305, X25519, MOBIKE, transport mode, PFS via ECP-256; carries an SSH session and chat traffic.",
+    "file": "ipv6_natt_chacha_transport.pcap",
+    "size_bytes": 360866
+  },
+  "ah_only_no_confidentiality": {
+    "ike_version": 2,
+    "ike": "AES_CBC-256 / HMAC_SHA2_256_128 / MODP-2048",
+    "esp_framing": null,
+    "esp": "AH only, HMAC-SHA1-96",
+    "mode": "transport",
+    "traffic": "icmp",
+    "pfs": "unknown",
+    "ipver": 4,
+    "expected_grade": [
+      "F",
+      "D"
+    ],
+    "description": "Authentication Header only: packets are integrity-protected but every byte of the payload travels in cleartext.",
+    "file": "ah_only_no_confidentiality.pcap",
+    "size_bytes": 13972
+  },
+  "replay_flood_anomalies": {
+    "ike_version": 2,
+    "ike": "AES_GCM_16-128 / PRF_HMAC_SHA2_256 / MODP-2048",
+    "esp_framing": "o24_b4",
+    "esp": "AES-GCM-16 (AEAD)",
+    "mode": "tunnel",
+    "traffic": "video",
+    "pfs": "unknown",
+    "ipver": 4,
+    "expected_grade": [
+      "C",
+      "B",
+      "D"
+    ],
+    "description": "Operational anomalies: replayed and decreasing ESP sequence numbers, an IKE_SA_INIT flood answered with cookies, a malformed IKE packet and cleartext traffic beside the tunnel. ESP packets are snaplen-truncated to 128 B to show that the length physics survives truncated captures.",
+    "file": "replay_flood_anomalies.pcap",
+    "size_bytes": 504944
+  },
+  "hub_three_spokes_mixed_traffic": {
+    "ike_version": 2,
+    "ike": "AES_GCM_16-128 / MODP-2048 (x2) and AES_CBC-128 / SHA1 / MODP-2048 (x1)",
+    "esp_framing": "o24_b4 (x2), o28_b16 (x1)",
+    "esp": "AES-GCM-16 (x2), AES-CBC + HMAC-SHA1-96 (x1)",
+    "mode": "tunnel",
+    "traffic": "video, chat, file",
+    "pfs": "unknown",
+    "ipver": 4,
+    "expected_grade": [
+      "B",
+      "C"
+    ],
+    "description": "Hub-and-spoke: three tunnels carrying video streaming, WhatsApp-like chat and a bulk file download; one spoke still uses AES-CBC + SHA-1. No rekey in the window, so PFS is honestly reported as Unknown.",
+    "file": "hub_three_spokes_mixed_traffic.pcap",
+    "size_bytes": 7097264
+  }
+}

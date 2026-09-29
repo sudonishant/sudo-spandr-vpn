@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+frontend/node_modules/
+data/
+testbed/strongswan/pcaps/*.pcap
+testbed/strongswan/pki/*.pem
+testbed/strongswan/pki/*/*.pem
+reports/
+*.log

@@ -1,0 +1,832 @@
+# IPsec X-Ray check catalogue (66 checks). Each check is a boolean expression over the facts document.
+# scope: ike (per IKE SA) | tunnel (per ESP/AH tunnel) | capture (whole file)
+# severity: default; severity_by_profile overrides per profile (baseline / enterprise / government / pqc_ready); "none" = not applicable
+# domain: ke conf integ fs replay meta hygiene  (score caps 20/20/15/15/10/10/10)
+# tier/confidence: expressions giving the evidence tier and confidence of the finding (default Observed / 1.0)
+
+defaults:
+  penalty_by_severity: {critical: 12, high: 8, medium: 5, low: 2, info: 0}
+  risk_weight_by_severity: {critical: 25, high: 15, medium: 8, low: 3, info: 0}
+
+checks:
+# ------------------------------------------------------------------ IKE protocol & key exchange
+- id: IKE-001
+  family: IKE
+  title: IKEv1 in use
+  scope: ike
+  when: "version == 1"
+  requires: "complete"
+  severity: high
+  severity_by_profile: {government: critical, pqc_ready: critical}
+  domain: ke
+  ref: "RFC 9395 (IKEv1 deprecated), RFC 8247"
+  threat: [TH-01, TH-04]
+  message: "IKEv1 ({v1_mode} mode) negotiated between {initiator} and {responder}"
+  fix: "Migrate both peers to IKEv2 (RFC 7296) and disable IKEv1 listeners on the gateway."
+- id: IKE-002
+  family: IKE
+  title: IKEv1 Aggressive Mode
+  scope: ike
+  when: "version == 1 and v1_mode == 'aggressive'"
+  severity: high
+  severity_by_profile: {enterprise: critical, government: critical, pqc_ready: critical}
+  domain: ke
+  ref: "RFC 2409 §5.4; Felsch et al. USENIX 2018"
+  threat: [TH-04, TH-07]
+  message: "Aggressive Mode exchange observed - identities and PSK hash material travel before encryption starts"
+  fix: "Disable aggressive mode (strongSwan: aggressive=no; Cisco: crypto isakmp aggressive-mode disable); use IKEv2."
+- id: IKE-003
+  family: IKE
+  title: Weak Diffie-Hellman group negotiated
+  scope: ike
+  when: "dh_id in [1, 2, 5, 22, 23, 24]"
+  severity: high
+  severity_by_profile: {government: critical, pqc_ready: critical}
+  penalty_expr: "12 if dh_id in [1, 22] else 8"
+  domain: ke
+  ref: "RFC 8247 §2.4 (MODP-768/1024 MUST NOT / SHOULD NOT); Logjam (Adrian et al. CCS 2015)"
+  threat: [TH-01, TH-02]
+  message: "{dh} ({dh_bits}-bit security) selected for the IKE key exchange"
+  fix: "Use MODP-2048 (group 14) at minimum; prefer ECP-256/384 (19/20) or X25519 (31)."
+- id: IKE-004
+  family: IKE
+  title: Minimum-strength DH group (MODP-2048) only
+  scope: ike
+  when: "dh_id == 14"
+  severity: info
+  severity_by_profile: {enterprise: low, government: medium, pqc_ready: medium}
+  domain: ke
+  ref: "RFC 8247 §2.4; NSA CNSA 2.0 (MODP-3072/4096 or ECP-384)"
+  threat: [TH-01]
+  message: "MODP-2048 meets the RFC 8247 floor but not CNSA 2.0 - {dh_bits}-bit security"
+  fix: "Prefer ECP-384 (group 20) or MODP-3072/4096 (15/16) for long-lived data."
+- id: IKE-005
+  family: IKE
+  title: No post-quantum hybrid key exchange
+  scope: ike
+  when: "not pqc_hybrid"
+  requires: "complete"
+  severity: info
+  severity_by_profile: {enterprise: low, government: medium, pqc_ready: critical}
+  domain: ke
+  ref: "RFC 9370 (multiple key exchanges), draft-ietf-ipsecme-ikev2-mlkem, CNSA 2.0 timeline"
+  threat: [TH-02]
+  message: "No ML-KEM / additional key exchange - traffic recorded today can be decrypted once a quantum computer exists"
+  fix: "Enable hybrid ML-KEM (strongSwan 6: ke1_mlkem768 / ke1_mlkem1024 in the proposal) via IKE_INTERMEDIATE."
+- id: IKE-006
+  family: IKE
+  title: Weak IKE encryption algorithm
+  scope: ike
+  when: "encr_strength in ['broken', 'weak', 'none']"
+  severity: high
+  penalty_expr: "12 if encr_strength in ['broken', 'none'] else 8"
+  severity_by_profile: {government: critical, pqc_ready: critical}
+  domain: conf
+  ref: "RFC 8247 §2.1 (DES/NULL MUST NOT, 3DES MAY-); RFC 9395; Sweet32"
+  threat: [TH-03]
+  message: "IKE SA encrypted with {encr_label} (strength class: {encr_strength})"
+  fix: "Use AES-GCM-16 (AES-256) or AES-CBC-256 with HMAC-SHA2-256 for the IKE SA."
+- id: IKE-007
+  family: IKE
+  title: SHA-1 PRF or integrity in IKE
+  scope: ike
+  when: "prf == 'HMAC_SHA1' or integ == 'HMAC_SHA1_96' or integ == 'HMAC_SHA1'"
+  severity: medium
+  severity_by_profile: {government: high, pqc_ready: high}
+  domain: integ
+  ref: "RFC 8247 §2.2/2.3 (SHA-1 MUST-)"
+  threat: [TH-05]
+  message: "PRF={prf}, INTEG={integ}: SHA-1 based"
+  fix: "Use PRF_HMAC_SHA2_256/384 and HMAC-SHA2-256-128 (or an AEAD cipher)."
+- id: IKE-008
+  family: IKE
+  title: MD5 PRF or integrity in IKE
+  scope: ike
+  when: "prf == 'HMAC_MD5' or integ == 'HMAC_MD5_96' or integ == 'HMAC_MD5'"
+  severity: critical
+  domain: integ
+  ref: "RFC 8247 (MUST NOT); RFC 6151"
+  threat: [TH-05]
+  message: "MD5 used for IKE PRF/integrity ({prf} / {integ})"
+  fix: "Remove MD5 from every proposal; use SHA2-256 or better."
+- id: IKE-009
+  family: IKE
+  title: Weak transforms offered (downgrade surface)
+  scope: ike
+  when: "len(weak_offered) > 0"
+  severity: medium
+  severity_by_profile: {enterprise: high, government: high, pqc_ready: high}
+  domain: ke
+  ref: "RFC 8247 §1 (remove deprecated algorithms from proposals)"
+  threat: [TH-06]
+  message: "Initiator offered weak transforms: {weak_offered}"
+  fix: "Delete legacy transforms from the proposal list so an on-path attacker cannot force a downgrade."
+- id: IKE-010
+  family: IKE
+  title: INVALID_KE_PAYLOAD group renegotiation
+  scope: ike
+  when: "'INVALID_KE_PAYLOAD' in notifies"
+  severity: high
+  domain: ke
+  ref: "RFC 7296 §1.2 / §2.7"
+  threat: [TH-06]
+  message: "Responder forced a different DH group via INVALID_KE_PAYLOAD - verify the final group ({dh}) is not a downgrade"
+  fix: "Align the preferred DH group on both peers; log INVALID_KE_PAYLOAD events."
+- id: IKE-011
+  family: IKE
+  title: IKE SA lifetime excessive
+  scope: ike
+  when: "(lifetime_seconds is not None and lifetime_seconds > profile.max_ike_lifetime) or (duration > profile.max_ike_lifetime and version == 2)"
+  severity: low
+  severity_by_profile: {enterprise: medium, government: medium}
+  domain: fs
+  ref: "NIST SP 800-77r1 §4.4 (lifetimes)"
+  threat: [TH-02]
+  message: "IKE SA lifetime {lifetime_seconds} s / observed {duration} s exceeds profile limit {profile.max_ike_lifetime} s"
+  fix: "Set the IKE SA rekey time to <= 24 h (enterprise 8 h)."
+- id: IKE-012
+  family: IKE
+  title: IKEv2 fragmentation not negotiated with large IKE_AUTH
+  scope: ike
+  when: "version == 2 and not fragmentation and len(ike_auth_lens) > 0 and max(ike_auth_lens) > 1400"
+  severity: low
+  domain: hygiene
+  ref: "RFC 7383"
+  threat: [TH-10]
+  message: "IKE_AUTH of {ike_auth_lens} bytes without IKEV2_FRAGMENTATION_SUPPORTED - IP fragmentation may be dropped by middleboxes"
+  fix: "Enable IKEv2 fragmentation (strongSwan: fragmentation=yes)."
+- id: IKE-013
+  family: IKE
+  title: No cookie challenge under IKE_SA_INIT flood
+  scope: capture
+  when: "orphan_inits >= 20 and not cookie_seen"
+  severity: low
+  severity_by_profile: {enterprise: medium, government: medium}
+  domain: hygiene
+  ref: "RFC 7296 §2.6"
+  threat: [TH-10]
+  message: "{orphan_inits} half-open IKE_SA_INITs and no COOKIE notifications from the responder"
+  fix: "Enable cookie/puzzle DoS protection (strongSwan: cookie_threshold)."
+- id: IKE-014
+  family: IKE
+  title: Non-standard AES key length (192)
+  scope: ike
+  when: "keylen == 192"
+  severity: info
+  domain: conf
+  ref: "RFC 8247 §2.1"
+  threat: []
+  message: "AES-192 negotiated"
+  fix: "Use AES-128 or AES-256 for interoperability and CNSA alignment."
+- id: IKE-015
+  family: IKE
+  title: IKE encryption is not AEAD
+  scope: ike
+  when: "version == 2 and not encr_aead and encr_strength == 'strong'"
+  severity: info
+  severity_by_profile: {enterprise: low, government: low, pqc_ready: low}
+  domain: conf
+  ref: "RFC 8247 §2.1 (AES-GCM SHOULD)"
+  threat: [TH-05]
+  message: "IKE SA uses {encr_label} with separate integrity ({integ})"
+  fix: "Prefer AES-GCM-16 for the IKE SA."
+- id: IKE-016
+  family: IKE
+  title: Additional key exchange uses classical groups only
+  scope: ike
+  when: "len(chosen.addke) > 0 and not pqc_hybrid"
+  severity: info
+  severity_by_profile: {pqc_ready: medium}
+  domain: ke
+  ref: "RFC 9370"
+  threat: [TH-02]
+  message: "ADDKE transforms present but none is ML-KEM: {chosen.addke}"
+  fix: "Add ML-KEM-768/1024 as an additional key exchange."
+
+# ------------------------------------------------------------------ Authentication
+- id: AUTH-001
+  family: AUTH
+  title: PSK with IKEv1 Aggressive Mode
+  scope: ike
+  when: "version == 1 and v1_mode == 'aggressive' and auth.psk"
+  severity: critical
+  domain: ke
+  ref: "Felsch et al. USENIX 2018; IKE-Crack / psk-crack"
+  threat: [TH-07]
+  message: "Aggressive mode + PSK ({auth.method}): HASH_R is exposed - offline dictionary attack on the PSK"
+  fix: "Move to IKEv2 with certificates or EAP; if PSK must stay, use main mode and >= 32 random characters."
+- id: AUTH-002
+  family: AUTH
+  title: Pre-shared-key authentication
+  scope: ike
+  when: "auth.psk"
+  severity: low
+  severity_by_profile: {enterprise: medium, government: high, pqc_ready: high}
+  domain: ke
+  tier: "auth.tier"
+  confidence: "auth.confidence"
+  ref: "NIST SP 800-77r1 §4.2.1; RFC 7296 §2.15"
+  threat: [TH-07]
+  message: "Authentication method: {auth.method}"
+  fix: "Use certificate-based (RSA-3072/ECDSA P-384) or EAP-TLS authentication; rotate PSKs and use unique keys per peer."
+- id: AUTH-003
+  family: AUTH
+  title: XAUTH extended authentication
+  scope: ike
+  when: "auth.xauth"
+  severity: high
+  domain: ke
+  ref: "draft-ietf-ipsec-isakmp-xauth-06 (expired); RFC 9395"
+  threat: [TH-07]
+  message: "XAUTH ({auth.method}) - group PSK plus username/password, vulnerable to rogue gateway attacks"
+  fix: "Replace XAUTH with IKEv2 EAP (EAP-TLS / EAP-MSCHAPv2 over server-certificate auth)."
+- id: AUTH-004
+  family: AUTH
+  title: EAP password-based method inferred
+  scope: ike
+  when: "auth.eap"
+  severity: medium
+  domain: ke
+  tier: "auth.tier"
+  confidence: "auth.confidence"
+  ref: "RFC 7296 §2.16; RFC 5998 (EAP-only)"
+  threat: [TH-07]
+  message: "Multi-round IKE_AUTH indicates EAP ({auth.evidence}); password methods (MSCHAPv2) are phishable"
+  fix: "Prefer EAP-TLS or certificate authentication; enforce server certificate validation on clients."
+- id: AUTH-005
+  family: AUTH
+  title: Certificate RSA key shorter than 2048 bits
+  scope: ike
+  when: "get(_, 'cert_key_bits') is not None and cert_key_bits < 2048"
+  severity: high
+  domain: ke
+  ref: "RFC 8247 §3.2; NIST SP 800-131A"
+  threat: [TH-07]
+  message: "Peer certificate key is {cert_key_bits} bits"
+  fix: "Re-issue certificates with RSA-3072 or ECDSA P-256/P-384."
+- id: AUTH-006
+  family: AUTH
+  title: SHA-1 offered in SIGNATURE_HASH_ALGORITHMS
+  scope: ike
+  when: "sig_hash_sha1"
+  severity: low
+  severity_by_profile: {government: medium, pqc_ready: medium}
+  domain: integ
+  ref: "RFC 7427 §4; RFC 8247 §3.3"
+  threat: [TH-05]
+  message: "Signature hash list {sig_hash_algs} still contains SHA-1 (id 1)"
+  fix: "Restrict signature hashes to SHA-256/384/512."
+- id: AUTH-007
+  family: AUTH
+  title: IKEv1 RSA-encryption authentication (Bleichenbacher)
+  scope: ike
+  when: "auth.rsa_encryption"
+  severity: high
+  domain: ke
+  ref: "Felsch et al. USENIX 2018 (CVE-2018-0131, CVE-2018-5389)"
+  threat: [TH-04]
+  message: "RSA-encryption based IKEv1 authentication ({auth.method}) is oracle-attackable"
+  fix: "Use RSA/ECDSA signatures, or migrate to IKEv2."
+
+# ------------------------------------------------------------------ ESP confidentiality
+- id: ESP-C-001
+  family: ESP-C
+  title: NULL encryption on ESP
+  scope: tunnel
+  when: "protocol == 'ESP' and framing.null_encr"
+  severity: critical
+  penalty: 20
+  domain: conf
+  tier: "framing.tier"
+  confidence: "framing.confidence"
+  ref: "RFC 8221 §5 (ENCR_NULL only with integrity, no confidentiality); RFC 2410"
+  threat: [TH-03, TH-08]
+  message: "ESP framing matches {framing.label} - payload readable on the path (confidence {framing.confidence})"
+  fix: "Configure an AEAD cipher (AES-GCM-16) on the Child SA; NULL is only acceptable for debugging."
+- id: ESP-C-002
+  family: ESP-C
+  title: DES/3DES-class cipher on ESP
+  scope: tunnel
+  when: "protocol == 'ESP' and framing.legacy"
+  severity: high
+  severity_by_profile: {government: critical, pqc_ready: critical}
+  domain: conf
+  tier: "framing.tier"
+  confidence: "framing.confidence"
+  ref: "RFC 8221 §5 (DES MUST NOT, 3DES SHOULD NOT); Sweet32 (Bhargavan & Leurent 2016)"
+  threat: [TH-03]
+  message: "8-byte block framing: {framing.label} (confidence {framing.confidence})"
+  fix: "Replace with AES-GCM-16 (128/256)."
+- id: ESP-C-003
+  family: ESP-C
+  title: AES-CBC with SHA-1 legacy suite on ESP
+  scope: tunnel
+  when: "protocol == 'ESP' and framing.cbc and framing.icv == 12"
+  severity: medium
+  severity_by_profile: {government: high, pqc_ready: high}
+  domain: conf
+  tier: "framing.tier"
+  confidence: "framing.confidence"
+  ref: "RFC 8221 §6 (HMAC-SHA1-96 MUST-)"
+  threat: [TH-05]
+  message: "ESP framing {framing.label} (16-byte blocks, 12-byte ICV)"
+  fix: "Move to AES-GCM-16 or at least AES-CBC + HMAC-SHA2-256-128."
+- id: ESP-C-004
+  family: ESP-C
+  title: Short AEAD ICV (8 or 12 bytes)
+  scope: tunnel
+  when: "protocol == 'ESP' and framing.aead and framing.icv in [8, 12]"
+  severity: low
+  severity_by_profile: {enterprise: medium, government: medium, pqc_ready: medium}
+  domain: integ
+  tier: "framing.tier"
+  confidence: "framing.confidence"
+  ref: "RFC 8221 §5 (GCM-8/12 MAY)"
+  threat: [TH-05]
+  message: "AEAD with {framing.icv}-byte tag: {framing.label}"
+  fix: "Use the 16-byte ICV variants (AES-GCM-16 / CCM-16)."
+- id: ESP-C-005
+  family: ESP-C
+  title: AES-256 not verifiable (government profile)
+  scope: tunnel
+  when: "protocol == 'ESP' and profile.require_aes256 and framing.family in ['aead', 'cbc', 'ctr']"
+  severity: none
+  severity_by_profile: {government: medium, pqc_ready: medium}
+  domain: conf
+  tier: "'Unknown'"
+  confidence: "0.0"
+  ref: "CNSA 2.0 (AES-256); RFC 8221"
+  threat: [TH-02]
+  message: "AES key length is not visible on the wire; the profile requires AES-256 - confirm in the gateway configuration"
+  fix: "Pin AES-256 (aes256gcm16) in both peers' proposals and export the config for review."
+- id: ESP-C-006
+  family: ESP-C
+  title: Non-AEAD ESP suite
+  scope: tunnel
+  when: "protocol == 'ESP' and (framing.cbc or framing.family == 'ctr')"
+  severity: info
+  severity_by_profile: {enterprise: low, government: low, pqc_ready: low}
+  domain: conf
+  tier: "framing.tier"
+  confidence: "framing.confidence"
+  ref: "RFC 8221 §5 (AES-GCM-16 MUST, preferred)"
+  threat: [TH-05]
+  message: "Encrypt-then-MAC framing ({framing.label}) instead of AEAD"
+  fix: "Prefer AES-GCM-16 or ChaCha20-Poly1305."
+- id: ESP-C-007
+  family: ESP-C
+  title: Cipher-suite inference has low confidence
+  scope: tunnel
+  when: "protocol == 'ESP' and framing.confidence < 0.7"
+  severity: info
+  domain: conf
+  tier: "'Unknown'"
+  confidence: "framing.confidence"
+  ref: "IPsec X-Ray methodology (residue model)"
+  threat: []
+  message: "Best framing guess {framing.label} only at {framing.confidence} - capture more / more diverse traffic"
+  fix: "Capture at least a few hundred packets including small packets (ACKs, pings) to sharpen the inference."
+- id: ESP-C-008
+  family: ESP-C
+  title: IKE and ESP cipher families differ
+  scope: tunnel
+  when: "protocol == 'ESP' and ike_encr_aead == True and framing.cbc"
+  severity: info
+  domain: conf
+  tier: "framing.tier"
+  confidence: "framing.confidence"
+  ref: "Operational consistency"
+  threat: []
+  message: "IKE SA uses AEAD but the Child SA appears to use CBC ({framing.label}) - inconsistent policy"
+  fix: "Align IKE and ESP proposals (AES-GCM-16 for both)."
+
+# ------------------------------------------------------------------ ESP / AH integrity
+- id: ESP-I-001
+  family: ESP-I
+  title: MD5 integrity on ESP
+  scope: tunnel
+  when: "protocol == 'ESP' and framing.icv == 12 and ike_version == 1 and ike_hash == 'MD5'"
+  severity: high
+  domain: integ
+  tier: "framing.tier"
+  confidence: "framing.confidence"
+  ref: "RFC 8221 §6 (HMAC-MD5-96 MUST NOT)"
+  threat: [TH-05]
+  message: "12-byte ICV and MD5 negotiated in phase 1 - ESP integrity is most likely HMAC-MD5-96"
+  fix: "Use HMAC-SHA2-256-128 or an AEAD cipher."
+- id: ESP-I-002
+  family: ESP-I
+  title: 96-bit truncated HMAC (SHA1-96) integrity
+  scope: tunnel
+  when: "protocol == 'ESP' and framing.icv == 12 and (framing.cbc or framing.legacy or framing.null_encr) and not (ike_version == 1 and ike_hash == 'MD5')"
+  severity: medium
+  severity_by_profile: {government: high, pqc_ready: high}
+  domain: integ
+  tier: "framing.tier"
+  confidence: "framing.confidence"
+  ref: "RFC 8221 §6 (HMAC-SHA1-96 MUST-)"
+  threat: [TH-05]
+  message: "12-byte ICV: {framing.label}"
+  fix: "Use HMAC-SHA2-256-128 (16-byte ICV) or AES-GCM-16."
+- id: ESP-I-003
+  family: ESP-I
+  title: ESP without integrity protection
+  scope: tunnel
+  when: "protocol == 'ESP' and framing.integ_bits == 0"
+  severity: critical
+  domain: integ
+  tier: "framing.tier"
+  confidence: "framing.confidence"
+  ref: "RFC 8221 §3 (encryption MUST be authenticated)"
+  threat: [TH-05, TH-09]
+  message: "No ICV in the ESP framing - packets can be forged or bit-flipped"
+  fix: "Enable integrity (AEAD or HMAC-SHA2)."
+- id: ESP-I-004
+  family: ESP-I
+  title: AH only - no confidentiality
+  scope: tunnel
+  when: "protocol == 'AH'"
+  severity: critical
+  penalty: 20
+  domain: conf
+  ref: "RFC 4302; NIST SP 800-77r1 §3.2 (ESP preferred)"
+  threat: [TH-03, TH-08]
+  message: "Authentication Header SA ({framing.label}) carries {packets} packets in cleartext"
+  fix: "Use ESP with an AEAD cipher; AH gives integrity only."
+
+# ------------------------------------------------------------------ Forward secrecy & lifetimes
+- id: FS-001
+  family: FS
+  title: Child SA rekey without PFS
+  scope: tunnel
+  when: "pfs.state == 'off'"
+  severity: high
+  severity_by_profile: {government: critical, pqc_ready: critical}
+  domain: fs
+  tier: "pfs.tier"
+  confidence: "pfs.confidence"
+  ref: "RFC 7296 §1.3.3; NIST SP 800-77r1 §4.4.3"
+  threat: [TH-02]
+  message: "{pfs.evidence}"
+  fix: "Enable PFS on the Child SA (strongSwan: esp=aes256gcm16-ecp384; Cisco: set pfs group20)."
+- id: FS-002
+  family: FS
+  title: PFS with a weak DH group
+  scope: tunnel
+  when: "pfs.state == 'on' and ike_dh_id in [1, 2, 5, 22, 23, 24]"
+  severity: high
+  domain: fs
+  tier: "pfs.tier"
+  confidence: "pfs.confidence"
+  ref: "RFC 8247 §2.4; Logjam"
+  threat: [TH-01, TH-02]
+  message: "PFS is on but the IKE SA uses a weak group (id {ike_dh_id}); the Child SA almost certainly reuses it"
+  fix: "Use ECP-384 / MODP-3072 for PFS."
+- id: FS-003
+  family: FS
+  title: Child SA lifetime above profile maximum
+  scope: tunnel
+  when: "len(lifetimes) > 0 and max(lifetimes) > profile.max_child_lifetime"
+  severity: medium
+  domain: fs
+  ref: "NIST SP 800-77r1 §4.4"
+  threat: [TH-02]
+  message: "Observed rekey interval {lifetimes} s > profile maximum {profile.max_child_lifetime} s"
+  fix: "Lower the Child SA lifetime (1 h typical)."
+- id: FS-004
+  family: FS
+  title: Excess data under a 64-bit block cipher
+  scope: tunnel
+  when: "protocol == 'ESP' and framing.legacy and max_flow_bytes > profile.legacy_max_bytes"
+  severity: high
+  domain: conf
+  tier: "framing.tier"
+  confidence: "framing.confidence"
+  ref: "Sweet32 (birthday bound of 64-bit blocks)"
+  threat: [TH-03]
+  message: "{max_flow_bytes} bytes on a single 3DES/DES-class SA"
+  fix: "Rekey at most every 1 GB, or (better) switch to AES-GCM."
+- id: FS-005
+  family: FS
+  title: No rekey observed in a long capture
+  scope: tunnel
+  when: "duration > profile.max_child_lifetime and rekey_count == 0"
+  severity: medium
+  domain: fs
+  ref: "NIST SP 800-77r1 §4.4"
+  threat: [TH-02]
+  message: "{duration} s of traffic on the same SPIs without a rekey"
+  fix: "Check lifetime settings on both peers."
+- id: FS-006
+  family: FS
+  title: PFS state unknown (no rekey in capture)
+  scope: tunnel
+  when: "pfs.state == 'unknown'"
+  severity: info
+  domain: fs
+  tier: "'Unknown'"
+  confidence: "0.0"
+  ref: "IPsec X-Ray methodology"
+  threat: []
+  message: "{pfs.evidence}"
+  fix: "Capture across a Child SA rekey (or lower the lifetime temporarily) to determine PFS."
+
+# ------------------------------------------------------------------ Anti-replay & sequence numbers
+- id: SEQ-001
+  family: SEQ
+  title: Duplicate ESP sequence numbers
+  scope: tunnel
+  when: "replay.duplicates > 0"
+  severity: high
+  domain: replay
+  ref: "RFC 4303 §3.4.3"
+  threat: [TH-09]
+  message: "{replay.duplicates} duplicated sequence numbers on the tunnel (replayed or mirrored packets)"
+  fix: "Confirm anti-replay is enabled on the receiver (replay window >= 64) and investigate the source of duplicates."
+- id: SEQ-002
+  family: SEQ
+  title: Decreasing ESP sequence numbers
+  scope: tunnel
+  when: "replay.decreasing > 0"
+  severity: high
+  domain: replay
+  ref: "RFC 4303 §3.3.3"
+  threat: [TH-09]
+  message: "{replay.decreasing} sequence-number decreases observed"
+  fix: "Investigate injection/replay; verify SA state is not being reset or cloned (HA sync)."
+- id: SEQ-003
+  family: SEQ
+  title: Sequence number near exhaustion without rekey
+  scope: tunnel
+  when: "replay.seq_max > 2147483648 and rekey_count == 0"
+  severity: medium
+  domain: replay
+  ref: "RFC 4303 §3.3.3 (rekey before 2^32)"
+  threat: [TH-09]
+  message: "Highest sequence number {replay.seq_max}"
+  fix: "Enable ESN and/or rekey by packet count."
+- id: SEQ-004
+  family: SEQ
+  title: Anti-replay window size not observable
+  scope: tunnel
+  when: "protocol == 'ESP'"
+  severity: info
+  domain: replay
+  tier: "'Unknown'"
+  confidence: "0.0"
+  ref: "RFC 4303 §3.4.3"
+  threat: [TH-09]
+  message: "Replay window is a receiver-side setting and cannot be seen passively; some vendors default to disabled"
+  fix: "Verify replay-window >= 64 (strongSwan: replay_window; Cisco: crypto ipsec security-association replay window-size)."
+- id: SEQ-005
+  family: SEQ
+  title: Extended Sequence Numbers not observable
+  scope: tunnel
+  when: "protocol == 'ESP'"
+  severity: info
+  domain: replay
+  tier: "'Unknown'"
+  confidence: "0.0"
+  ref: "RFC 4303 §2.2.1"
+  threat: []
+  message: "ESN high-order bits are never transmitted; state is Unknown"
+  fix: "Enable ESN on high-rate tunnels (>= 1 Gbit/s)."
+
+# ------------------------------------------------------------------ Metadata exposure
+- id: META-001
+  family: META
+  title: Application type inferable from encrypted traffic
+  scope: tunnel
+  when: "leak_score > 70"
+  severity: low
+  severity_by_profile: {enterprise: medium, government: high, pqc_ready: medium}
+  domain: meta
+  tier: "traffic.tier"
+  confidence: "traffic.confidence"
+  ref: "RFC 4303 §2.7 (TFC padding); Draper-Gil et al. 2016 (ISCX VPN)"
+  threat: [TH-08]
+  message: "Traffic classifier identifies {traffic.label} with {traffic.confidence} confidence (leak meter {leak_score}/100)"
+  fix: "Enable TFC padding / dummy packets (RFC 4303 §2.6-2.7) or aggregate flows."
+- id: META-002
+  family: META
+  title: No traffic-flow-confidentiality padding
+  scope: tunnel
+  when: "protocol == 'ESP' and not tfc_padding_likely and size_diversity > 0.005"
+  severity: info
+  severity_by_profile: {enterprise: low, government: medium, pqc_ready: medium}
+  domain: meta
+  tier: "'Inferred'"
+  confidence: "0.8"
+  ref: "RFC 4303 §2.7"
+  threat: [TH-08]
+  message: "Packet sizes follow the application (size diversity {size_diversity}) - no TFC padding"
+  fix: "Enable TFC padding where supported (strongSwan: tfc = 1400)."
+- id: META-003
+  family: META
+  title: Identities transmitted in cleartext
+  scope: ike
+  when: "id_plaintext"
+  severity: high
+  domain: meta
+  ref: "RFC 2409 §5.4 (aggressive mode), RFC 7296 §2.15"
+  threat: [TH-08, TH-07]
+  message: "ID payloads visible before encryption: {ids}"
+  fix: "Use IKEv2 or IKEv1 main mode so identities are encrypted."
+- id: META-004
+  family: META
+  title: Vendor ID disclosure
+  scope: ike
+  when: "len(vendor_ids) > 0"
+  severity: low
+  domain: meta
+  ref: "RFC 7296 §3.12"
+  threat: [TH-08, TH-11]
+  message: "Vendor IDs fingerprint the implementation: {vendor_ids}"
+  fix: "Suppress non-essential vendor IDs where the product allows."
+- id: META-005
+  family: META
+  title: Keepalive / DPD cadence fingerprintable
+  scope: ike
+  when: "informational >= 3"
+  severity: info
+  domain: meta
+  ref: "RFC 3706; RFC 7296 §2.4"
+  threat: [TH-08]
+  message: "{informational} INFORMATIONAL exchanges - periodic DPD reveals liveness and vendor defaults"
+  fix: "Randomise DPD intervals if supported; not a critical issue."
+- id: META-006
+  family: META
+  title: Transport mode exposes the true endpoints
+  scope: tunnel
+  when: "mode.value == 'transport'"
+  severity: info
+  severity_by_profile: {enterprise: low, government: low, pqc_ready: low}
+  domain: meta
+  tier: "mode.tier"
+  confidence: "mode.confidence"
+  ref: "RFC 4301 §4.1"
+  threat: [TH-08]
+  message: "Transport mode inferred (confidence {mode.confidence}) - inner host addresses are the outer addresses"
+  fix: "Use tunnel mode for site-to-site traffic; transport mode is fine for host-to-host."
+- id: META-007
+  family: META
+  title: CERTREQ discloses trusted CA hashes
+  scope: ike
+  when: "certreq_seen"
+  severity: info
+  domain: meta
+  ref: "RFC 7296 §3.7"
+  threat: [TH-08]
+  message: "CERTREQ payload sent in IKE_SA_INIT reveals the CA set"
+  fix: "Acceptable; limit CERTREQ to the necessary CA."
+
+# ------------------------------------------------------------------ Network & configuration hygiene
+- id: NET-001
+  family: NET
+  title: NAT traversal (UDP 4500) in use
+  scope: ike
+  when: "nat_t"
+  severity: info
+  domain: hygiene
+  ref: "RFC 3948"
+  threat: [TH-11]
+  message: "ESP is UDP-encapsulated on port 4500 (NAT detected or forced)"
+  fix: "Informational; ensure keepalive interval < NAT timeout."
+- id: NET-002
+  family: NET
+  title: IKE on non-standard ports
+  scope: ike
+  when: "nonstandard_ports"
+  severity: low
+  domain: hygiene
+  ref: "RFC 7296 §2.23"
+  threat: [TH-11]
+  message: "IKE seen on ports {ports}"
+  fix: "Confirm this is intentional (port-floating / firewall policy)."
+- id: NET-003
+  family: NET
+  title: IKE/ESP over TCP (RFC 8229)
+  scope: capture
+  when: "esp_over_tcp"
+  severity: info
+  domain: hygiene
+  ref: "RFC 8229 / RFC 9329"
+  threat: [TH-11]
+  message: "{tcp_4500_packets} TCP/4500 packets - TCP encapsulation adds head-of-line blocking"
+  fix: "Prefer UDP where the path allows it."
+- id: NET-004
+  family: NET
+  title: MTU / inner fragmentation risk
+  scope: tunnel
+  when: "frac_mtu_size > 0.3"
+  severity: low
+  domain: hygiene
+  tier: "'Inferred'"
+  confidence: "0.7"
+  ref: "RFC 4301 §7; RFC 4459"
+  threat: [TH-10]
+  message: "{frac_mtu_size} of packets are at MTU size - verify MSS clamping / DF handling"
+  fix: "Clamp TCP MSS on the tunnel interface (e.g. 1360) and enable PMTUD."
+- id: NET-005
+  family: NET
+  title: Configuration drift between peers
+  scope: capture
+  when: "len(config_drift_pairs) > 0"
+  severity: medium
+  domain: hygiene
+  ref: "Operational baseline"
+  threat: [TH-06]
+  message: "Different IKE proposals negotiated between the same peers: {config_drift_pairs}"
+  fix: "Pin a single proposal per peer pair and manage configuration centrally."
+- id: NET-006
+  family: NET
+  title: Legacy vendor stack fingerprinted
+  scope: ike
+  when: "vendor_legacy"
+  severity: medium
+  domain: hygiene
+  tier: "'Inferred'"
+  confidence: "0.6"
+  ref: "Vendor advisories (Cisco Unity / draft NAT-T era stacks)"
+  threat: [TH-04, TH-11]
+  message: "Vendor IDs indicate a legacy client/gateway stack: {vendor_ids}"
+  fix: "Check the device against current CVE advisories and update firmware."
+- id: NET-007
+  family: NET
+  title: Dual-stack tunnels present
+  scope: capture
+  when: "ipv4 and ipv6"
+  severity: info
+  domain: hygiene
+  ref: "RFC 4301 §4.4"
+  threat: []
+  message: "Both IPv4 and IPv6 IPsec traffic in the capture - verify policies cover both families"
+  fix: "Audit SPD entries for both address families."
+- id: NET-008
+  family: NET
+  title: Multiple weak fallbacks across proposals
+  scope: ike
+  when: "len(weak_offered) >= 3"
+  severity: medium
+  domain: ke
+  ref: "RFC 8247 §1"
+  threat: [TH-06]
+  message: "{offered_count} proposals with {weak_offered} - large downgrade surface"
+  fix: "Reduce the proposal list to one or two modern suites."
+
+# ------------------------------------------------------------------ Anomalies
+- id: ANOM-001
+  family: ANOM
+  title: IKE_SA_INIT flood
+  scope: capture
+  when: "ike_init_rate_per_min > 30 and orphan_inits >= 10"
+  severity: medium
+  domain: hygiene
+  ref: "RFC 7296 §2.6"
+  threat: [TH-10]
+  message: "{orphan_inits} half-open IKE SAs from {incomplete_sources} sources at {ike_init_rate_per_min} INIT/min"
+  fix: "Enable cookies, rate-limit UDP/500, and block offending sources."
+- id: ANOM-002
+  family: ANOM
+  title: Renegotiation storm
+  scope: capture
+  when: "complete_sas > 20 and duration < 3600"
+  severity: medium
+  domain: hygiene
+  ref: "Operational baseline"
+  threat: [TH-10]
+  message: "{complete_sas} IKE SAs established in {duration} s"
+  fix: "Check for flapping links or misconfigured lifetimes."
+- id: ANOM-003
+  family: ANOM
+  title: SPI reuse across peers
+  scope: capture
+  when: "len(spi_reuse) > 0"
+  severity: medium
+  domain: replay
+  ref: "RFC 4303 §2.1"
+  threat: [TH-09]
+  message: "SPIs seen with more than one peer pair: {spi_reuse}"
+  fix: "Investigate SA cloning / weak SPI generation."
+- id: ANOM-004
+  family: ANOM
+  title: Malformed IKE messages
+  scope: capture
+  when: "parse_errors > 0"
+  severity: medium
+  domain: hygiene
+  ref: "RFC 7296 §2.21"
+  threat: [TH-04, TH-10]
+  message: "{parse_errors} IKE messages with invalid payload lengths"
+  fix: "Correlate with gateway logs; fuzzing or a buggy implementation."
+- id: ANOM-005
+  family: ANOM
+  title: Peer not in allow-list
+  scope: capture
+  when: "len(profile.allowed_peers) > 0 and not subset(endpoints, profile.allowed_peers)"
+  severity: high
+  domain: hygiene
+  ref: "Site policy"
+  threat: [TH-11]
+  message: "Endpoints {endpoints} include addresses outside the allow-list"
+  fix: "Block unknown peers at the firewall and review the SPD."

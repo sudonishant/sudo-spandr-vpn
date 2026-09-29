@@ -1,0 +1,90 @@
+# IPsec X-Ray real-tunnel testbed
+# Two strongSwan 6 gateways ("moon" and "sun") with a client host behind each one and a
+# "tap" container that records everything crossing the WAN segment with tcpdump.
+#
+#   alice (10.1.0.10) -- moon (192.168.0.1) ===[ WAN 192.168.0.0/24 ]=== sun (192.168.0.2) -- bob (10.2.0.10)
+#                                               ^ tap: tcpdump -i eth0 -w /pcaps/<scenario>.pcap
+#
+# Usage:   SCENARIO=good_gcm_pfs docker compose up -d
+#          ./capture.sh good_gcm_pfs voip        # records ~60 s of VoIP-like traffic through the tunnel
+#          docker compose down
+# Every scenario is a pair of swanctl.conf files under scenarios/<name>/{moon,sun}.conf.
+# Requires: docker + compose v2, kernel with xfrm (any recent Linux); NET_ADMIN for the gateways.
+
+x-gw: &gw
+  image: strongx509/strongswan:6.0.0          # official strongSwan image (swanctl / charon)
+  cap_add: [NET_ADMIN, SYS_MODULE]
+  sysctls:
+    net.ipv4.ip_forward: 1
+    net.ipv4.conf.all.rp_filter: 0
+  volumes:
+    - ./pki:/etc/swanctl/x509ca:ro
+  restart: "no"
+
+x-host: &host
+  image: nicolaka/netshoot:latest              # iperf3, hping3, curl, python3, tcpdump - traffic generators
+  cap_add: [NET_ADMIN]
+  command: ["sleep", "infinity"]
+
+services:
+  moon:
+    <<: *gw
+    container_name: xray-moon
+    hostname: moon
+    networks:
+      wan: { ipv4_address: 192.168.0.1 }
+      lan_moon: { ipv4_address: 10.1.0.1 }
+    volumes:
+      - ./pki:/etc/swanctl/x509ca:ro
+      - ./pki/moon:/etc/swanctl/x509:ro
+      - ./pki/moon-key:/etc/swanctl/private:ro
+      - ./scenarios/${SCENARIO:-good_gcm_pfs}/moon.conf:/etc/swanctl/conf.d/moon.conf:ro
+      - ./strongswan.conf:/etc/strongswan.conf:ro
+
+  sun:
+    <<: *gw
+    container_name: xray-sun
+    hostname: sun
+    networks:
+      wan: { ipv4_address: 192.168.0.2 }
+      lan_sun: { ipv4_address: 10.2.0.1 }
+    volumes:
+      - ./pki:/etc/swanctl/x509ca:ro
+      - ./pki/sun:/etc/swanctl/x509:ro
+      - ./pki/sun-key:/etc/swanctl/private:ro
+      - ./scenarios/${SCENARIO:-good_gcm_pfs}/sun.conf:/etc/swanctl/conf.d/sun.conf:ro
+      - ./strongswan.conf:/etc/strongswan.conf:ro
+
+  alice:
+    <<: *host
+    container_name: xray-alice
+    networks:
+      lan_moon: { ipv4_address: 10.1.0.10 }
+    # default route via moon so that 10.2.0.0/16 is pushed through the tunnel
+    entrypoint: ["sh", "-c", "ip route replace default via 10.1.0.1 && sleep infinity"]
+
+  bob:
+    <<: *host
+    container_name: xray-bob
+    networks:
+      lan_sun: { ipv4_address: 10.2.0.10 }
+    entrypoint: ["sh", "-c", "ip route replace default via 10.2.0.1 && (python3 -m http.server 80 &) && (iperf3 -s -D) && sleep infinity"]
+
+  tap:
+    image: nicolaka/netshoot:latest
+    container_name: xray-tap
+    network_mode: "service:sun"                # shares sun's network namespace -> sees WAN + ESP in cleartext framing
+    volumes:
+      - ./pcaps:/pcaps
+    command: ["sleep", "infinity"]
+
+networks:
+  wan:
+    driver: bridge
+    ipam: { config: [{ subnet: 192.168.0.0/24 }] }
+  lan_moon:
+    driver: bridge
+    ipam: { config: [{ subnet: 10.1.0.0/16 }] }
+  lan_sun:
+    driver: bridge
+    ipam: { config: [{ subnet: 10.2.0.0/16 }] }
