@@ -84,12 +84,13 @@ export default function Home({ profile, setProfile, profiles, navigate }) {
             <input ref={fileRef} type="file" accept=".pcap,.pcapng,.cap" style={{ display: 'none' }} onChange={(e) => upload(e.target.files[0])} />
             {busy ? <span><span className="spinner" /> Analyzing <b>{busy}</b> …</span>
               : <span><b>Drop a .pcap / .pcapng here</b> or click to choose<br /><span className="muted small">IKE on UDP 500/4500, ESP (IP proto 50 or UDP 4500), AH (proto 51). Up to 200 MB.</span></span>}
+          </div>
           <div className="mt" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <span className="small muted">⚡ Try preloaded scenario instantly:</span>
             <button className="btn small primary" disabled={!!busy} onClick={() => runSample('legacy_ikev1_aggressive_3des')}>
               Try Legacy (Grade F)
             </button>
-            <button className="btn small success" disabled={!!busy} onClick={() => runSample('good_ikev2_gcm_pqc_pfs')}>
+            <button className="btn small" style={{ borderColor: 'var(--green)', color: 'var(--green)' }} disabled={!!busy} onClick={() => runSample('good_ikev2_gcm_pqc_pfs')}>
               Try Modern PQC (Grade A)
             </button>
           </div>

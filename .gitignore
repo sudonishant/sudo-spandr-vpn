@@ -1,7 +1,11 @@
 __pycache__/
 *.pyc
+.venv
 .venv/
 .pytest_cache/
+node_modules
+node_modules/
+frontend/node_modules
 frontend/node_modules/
 data/
 testbed/strongswan/pcaps/*.pcap
@@ -9,3 +13,4 @@ testbed/strongswan/pki/*.pem
 testbed/strongswan/pki/*/*.pem
 reports/
 *.log
+.DS_Store

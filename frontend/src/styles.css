@@ -9,6 +9,33 @@ a { color: var(--blue); text-decoration: none; }
 button { font-family: inherit; }
 code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
+/* Accessibility & screen-reader utilities */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .topbar { background: var(--navy); color: #fff; display: flex; align-items: center; gap: 18px; padding: 0 22px; height: 54px; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
 .topbar .brand { font-weight: 700; font-size: 17px; letter-spacing: .02em; display: flex; align-items: center; gap: 10px; }
 .topbar .brand small { font-weight: 400; opacity: .75; font-size: 11.5px; margin-left: 4px; }
