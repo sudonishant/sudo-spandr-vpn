@@ -1,6 +1,14 @@
 # IPsec X-Ray — AI-powered IPsec VPN protocol analyzer & security assessment framework
 
+[![CI Test & Audit Pipeline](https://github.com/sudonishant/sudo-spandr-c4i-sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/sudonishant/sudo-spandr-c4i-sentinel/actions/workflows/ci.yml)
+[![Live WebUI](https://img.shields.io/badge/Live_Dashboard-Vercel-10b981?style=flat&logo=vercel)](https://sudo-vpn.vercel.app/)
+[![Dataset Card](https://img.shields.io/badge/Dataset-Ground_Truth_PCAPs-blue)](DATASET-CARD.md)
+[![Model Card](https://img.shields.io/badge/Models-RandomForest_Ensemble-purple)](MODEL-CARD.md)
+
 **SIH 2026 · Problem Statement SIH26160 (NTRO) · Team Sudo Spandr (ID 151087)**
+
+* **Live Demo URL**: [https://sudo-vpn.vercel.app/](https://sudo-vpn.vercel.app/)
+* **API Documentation**: [https://sudo-vpn.vercel.app/docs](https://sudo-vpn.vercel.app/docs)
 
 IPsec X-Ray takes a packet capture of an IPsec VPN and, **without keys, decryption or any active probing**,
 tells you what was negotiated, what is hidden inside the encrypted ESP stream, how secure the deployment is
